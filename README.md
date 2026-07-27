@@ -41,6 +41,30 @@ npm run check
 `svelte-check` and the test suite. `npm run build` produces `.output/firefox-mv3/`, and `npm run
 zip` packages it.
 
+## Installing it permanently in Firefox
+
+Firefox Release refuses to install unsigned extensions — `about:debugging` works but is wiped on
+restart, and the `xpinstall.signatures.required` pref does nothing on Release or Beta. The fix is
+**unlisted** signing: Mozilla signs the build, but it is never published or searchable.
+
+1. Get a JWT issuer and secret from
+   [addons.mozilla.org/developers/addon/api/key](https://addons.mozilla.org/en-US/developers/addon/api/key/).
+2. Put them in the environment (`web-ext` reads these names automatically, which keeps the secret
+   out of your shell history):
+
+   ```powershell
+   $env:WEB_EXT_API_KEY = 'user:12345678:123'
+   $env:WEB_EXT_API_SECRET = 'your-secret'
+   ```
+
+3. `npm run sign` — builds, uploads, waits for automated review, and writes a signed `.xpi` to
+   `.output/signed/`.
+4. `about:addons` → gear icon → **Install Add-on From File…** → pick that `.xpi`.
+
+To ship an update: bump `version` in `package.json` (AMO rejects a repeat upload of the same
+version), re-run `npm run sign`, and install the new `.xpi` over the old one. Data survives because
+the extension id is unchanged. Self-distributed add-ons never auto-update.
+
 ## How it's built
 
 WXT + Svelte 5 + TypeScript, Manifest V3, data in IndexedDB via Dexie.

@@ -1,5 +1,9 @@
 node_modules
 .output
+web-ext-artifacts
+# AMO API credentials — never commit these
+.env
+.env.local
 .wxt
 stats.html
 stats-*.json
