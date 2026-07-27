@@ -4,6 +4,8 @@ web-ext-artifacts
 # AMO API credentials — never commit these
 .env
 .env.local
+# Exported backups contain your actual lists, gifts included
+pluck-backup-*.json
 .wxt
 stats.html
 stats-*.json

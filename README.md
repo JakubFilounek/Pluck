@@ -66,9 +66,28 @@ restart, and the `xpinstall.signatures.required` pref does nothing on Release or
    `.output/signed/`.
 4. `about:addons` → gear icon → **Install Add-on From File…** → pick that `.xpi`.
 
-To ship an update: bump `version` in `package.json` (AMO rejects a repeat upload of the same
-version), re-run `npm run sign`, and install the new `.xpi` over the old one. Data survives because
-the extension id is unchanged. Self-distributed add-ons never auto-update.
+### Shipping an update
+
+The manifest carries an `update_url`, so Firefox updates itself once a release is published —
+no reinstalling. It polls roughly daily; `about:addons` → gear → *Check for Updates* forces it.
+
+1. Bump `version` in `package.json`. AMO rejects a repeat upload of the same version.
+2. `npm run sign` — signs, then regenerates `updates.json` for the new version. It refuses to
+   write the manifest if no signed `.xpi` for that version exists, so it can't publish a link
+   to a file that isn't there.
+3. Publish both — the two commands are printed by step 2:
+
+   ```bash
+   gh release create v1.1.0 ".output/signed/<name>.xpi" --title "v1.1.0" --notes ""
+   ```
+
+   then commit and push `updates.json`.
+
+**The repo must stay public.** Firefox fetches `updates.json` and the `.xpi` anonymously; making
+the repo private turns both into 404s and updates stop happening silently.
+
+Changing the `update_url` later means re-signing and one final manual reinstall, since that field
+is part of what gets signed.
 
 ## How it's built
 

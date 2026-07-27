@@ -47,6 +47,11 @@ export default defineConfig({
         // id is also the storage origin, so changing it later orphans existing data.
         id: 'pluck@slyjacobthebeast.dev',
         strict_min_version: '121.0',
+        // Self-distributed add-ons do not auto-update unless the signed manifest
+        // points at an update manifest. Firefox fetches this anonymously, so the
+        // repo must stay public or updates silently stop happening.
+        // Changing this URL later requires re-signing and a manual reinstall.
+        update_url: 'https://raw.githubusercontent.com/JakubFilounek/Pluck/master/updates.json',
         // Required by AMO for new submissions since 3 November 2025. Pluck sends
         // nothing anywhere: no network calls, no analytics, no sync.
         data_collection_permissions: {
