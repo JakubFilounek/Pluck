@@ -22,6 +22,11 @@ this Firefox profile.
   every field, grid and list views, and eight sort orders.
 - **Backup.** One-click JSON export and merge-import, with a reminder when the last export is over
   a month old.
+- **A theme each.** Switching the active person repaints the whole extension: person A gets a cool
+  blue, tech-flavoured look — drifting circuit grid, scanline, blinking terminal caret, monitor
+  emblem — and person B gets pastel pink with a black cat and a white cat with black spots, floating
+  paw prints, and softer, bouncier motion. A full-screen wipe carries the incoming person's emblem
+  between the two. All of it honours `prefers-reduced-motion`.
 
 ## Commands
 
@@ -78,6 +83,12 @@ WXT + Svelte 5 + TypeScript, Manifest V3, data in IndexedDB via Dexie.
 | `src/extract/` | JSON-LD → microdata → OpenGraph → Twitter → DOM heuristics |
 | `src/domain/` | Pure filter, sort and visibility logic |
 | `src/data/` | Dexie schema, queries, mutations, backup |
+| `src/ui/tokens.css` | Four palettes: person A/B × light/dark |
+| `src/ui/effects.css` | Keyframes, themed decoration, reduced-motion opt-out |
+
+Theming keys off two attributes on `<html>` — `data-person` (a/b) and `data-theme` (light/dark) —
+both set by `applyAppearance()` in `src/ui/theme.ts`. Adding a colour means adding it to all four
+blocks in `tokens.css`; nothing else hard-codes a colour.
 
 Two design rules worth knowing before changing anything:
 

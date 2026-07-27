@@ -1,0 +1,137 @@
+/*
+ * Palettes.
+ *
+ * Two axes: who is using it (data-person) and light vs dark (data-theme), so there
+ * are four complete palettes. Person A is cool blue and tech-flavoured, person B is
+ * pastel pink and cat-flavoured.
+ *
+ * The dark palettes are built to stay legible rather than atmospheric: surfaces are
+ * lifted well clear of the background, and --text-dim is bright enough that secondary
+ * text still reads instead of sinking into the panel.
+ */
+
+:root {
+  --radius: 12px;
+  --radius-sm: 7px;
+
+  /* Overridden by every palette below; declared so nothing is ever undefined. */
+  --glow: transparent;
+  --on-accent: #ffffff;
+  --cat-black: #241a22;
+  --cat-white: #f2ebef;
+  --cat-outline: transparent;
+  --cat-white-outline: transparent;
+}
+
+/* ---------------------------------------------------------------- Person A */
+/* Blue / tech. Cool, high contrast, a little bit terminal.                   */
+
+:root[data-person='a'] {
+  --bg: #eaf1fb;
+  --bg-2: #dbe7f8;
+  --surface: #ffffff;
+  --surface-2: #e4edfa;
+  --border: #c4d7f0;
+  --text: #0d1729;
+  --text-dim: #50688f;
+  --accent: #0a63c4;
+  --accent-2: #0093b8;
+  --accent-soft: #d6e6fb;
+  --accent-ghost: rgba(10, 99, 196, 0.22);
+  --want: #e08a1e;
+  --ok: #1f7a4d;
+  --danger: #c0392b;
+  --gift: #7c4dbd;
+  --glow: rgba(10, 99, 196, 0.35);
+  --on-accent: #ffffff;
+  --shadow: 0 1px 2px rgba(13, 23, 41, 0.07), 0 6px 18px rgba(13, 23, 41, 0.06);
+
+  color-scheme: light;
+}
+
+:root[data-person='a'][data-theme='dark'] {
+  --bg: #0a1220;
+  --bg-2: #0e1a2c;
+  --surface: #16233a;
+  --surface-2: #1f3150;
+  --border: #33496f;
+  --text: #eaf2ff;
+  --text-dim: #a2bade;
+  --accent: #59a7ff;
+  --accent-2: #34d7f0;
+  --accent-soft: #1b3a63;
+  --accent-ghost: rgba(89, 167, 255, 0.28);
+  --want: #ffb648;
+  --ok: #45c98a;
+  --danger: #ff7b6b;
+  --gift: #b98cff;
+  --glow: rgba(89, 167, 255, 0.5);
+  /* The dark accents are light colours, so filled buttons take dark text —
+     white on #59a7ff fails contrast badly. */
+  --on-accent: #07172c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 26px rgba(0, 0, 0, 0.42);
+
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- Person B */
+/* Pastel pink / cats. Soft, warm, rounded.                                   */
+
+:root[data-person='b'] {
+  --bg: #fdf1f6;
+  --bg-2: #fbe4ee;
+  --surface: #ffffff;
+  --surface-2: #fce8f1;
+  --border: #f6cfe1;
+  --text: #3a2130;
+  --text-dim: #8f6178;
+  --accent: #db5f97;
+  --accent-2: #b681dd;
+  --accent-soft: #fcdcea;
+  --accent-ghost: rgba(219, 95, 151, 0.22);
+  --want: #e8973f;
+  --ok: #3f9c72;
+  --danger: #cf4d5f;
+  --gift: #9b62cf;
+  --glow: rgba(219, 95, 151, 0.35);
+  --on-accent: #ffffff;
+  --cat-black: #241a22;
+  --cat-white: #ffffff;
+  --cat-outline: transparent;
+  /* The pale palette is nearly the same value as the white cat, so she needs an
+     outline here to keep a silhouette. In dark mode she pops unaided. */
+  --cat-white-outline: rgba(58, 33, 48, 0.22);
+  --shadow: 0 1px 2px rgba(58, 33, 48, 0.07), 0 6px 18px rgba(58, 33, 48, 0.07);
+
+  color-scheme: light;
+}
+
+:root[data-person='b'][data-theme='dark'] {
+  --bg: #1c1119;
+  --bg-2: #261823;
+  --surface: #2f1f2b;
+  --surface-2: #3f2b39;
+  --border: #573b4d;
+  --text: #fdeef5;
+  --text-dim: #d3a8bf;
+  --accent: #ff9ecb;
+  --accent-2: #d3a5f0;
+  --accent-soft: #4a2b3e;
+  --accent-ghost: rgba(255, 158, 203, 0.28);
+  --want: #ffc06a;
+  --ok: #5fd3a0;
+  --danger: #ff8a94;
+  --gift: #cfa4ff;
+  --glow: rgba(255, 158, 203, 0.5);
+  --on-accent: #38121f;
+  /* A true-black cat vanishes into a dark background — only its eyes survived.
+     Lifted to a warm charcoal and given a faint rim so the silhouette reads,
+     while still being obviously the darker of the two cats. */
+  --cat-black: #453341;
+  --cat-white: #f8f2f6;
+  --cat-outline: rgba(255, 233, 244, 0.22);
+  --cat-white-outline: transparent;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 26px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}

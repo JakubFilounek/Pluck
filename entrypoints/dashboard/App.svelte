@@ -20,7 +20,11 @@
   import SettingsDialog from '@/src/ui/SettingsDialog.svelte';
   import TagChip from '@/src/ui/TagChip.svelte';
   import WantStars from '@/src/ui/WantStars.svelte';
-  import { applyTheme } from '@/src/ui/theme';
+  import CatArt from '@/src/ui/CatArt.svelte';
+  import TechArt from '@/src/ui/TechArt.svelte';
+  import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
+  import ThemeTransition from '@/src/ui/ThemeTransition.svelte';
+  import { applyAppearance } from '@/src/ui/theme';
 
   let settings = $state<Settings | null>(null);
   let items = $state<Item[]>([]);
@@ -52,14 +56,15 @@
   async function boot() {
     await seedDefaults();
     settings = await loadSettings();
-    cleanupTheme = applyTheme(settings.theme);
+    cleanupTheme = applyAppearance(settings.theme, settings.activePerson);
 
-    // The person toggle can be flipped from the popup, and surprise mode depends on
-    // it — so the dashboard follows the setting rather than caching its own copy.
+    // The person toggle can be flipped from the popup, and both surprise mode and the
+    // whole palette depend on it — so the dashboard follows the setting rather than
+    // caching its own copy.
     cleanupSettings = watchSettings(async (next) => {
       settings = next;
       cleanupTheme();
-      cleanupTheme = applyTheme(next.theme);
+      cleanupTheme = applyAppearance(next.theme, next.activePerson);
       await refresh();
     });
 
@@ -94,6 +99,8 @@
 
   async function switchPerson(person: PersonId) {
     settings = await saveSettings({ activePerson: person });
+    cleanupTheme();
+    cleanupTheme = applyAppearance(settings.theme, person);
     await refresh();
   }
 
@@ -170,10 +177,17 @@
 </script>
 
 {#if settings}
+  <ThemeBackdrop person={settings.activePerson} />
+  <ThemeTransition person={settings.activePerson} />
+
   <div class="shell">
     <header class="topbar">
       <div class="row">
-        <span class="mark">Pluck</span>
+        <span class="mark">
+          Pluck{#if settings.activePerson === 'a'}<i class="tech-caret caret">_</i>{:else}<i
+              class="whiskers">🐾</i
+            >{/if}
+        </span>
         <span class="muted count">{items.length} shown</span>
       </div>
 
@@ -434,6 +448,13 @@
 
         {#if items.length === 0}
           <div class="empty">
+            <div class="empty-art">
+              {#if settings.activePerson === 'a'}
+                <TechArt size={200} />
+              {:else}
+                <CatArt size={220} />
+              {/if}
+            </div>
             {#if totalCount === 0}
               <h2>Nothing saved yet</h2>
               <p class="muted">
@@ -464,7 +485,10 @@
 
           {#if settings.viewMode === 'grid'}
             <div class="grid">
-              {#each items as item (item.id)}
+              {#each items as item, index (item.id)}
+                <!-- Staggered entrance, capped at 12 steps so a long list doesn't
+                     spend a visible amount of time cascading in. -->
+                <div class="enter" style="animation-delay: {Math.min(index, 12) * 22}ms">
                 <ItemCard
                   {item}
                   viewer={settings.activePerson}
@@ -476,11 +500,13 @@
                   onopen={() => (openItemId = item.id)}
                   onwant={(person, value) => rate(item.id, person, value)}
                 />
+                </div>
               {/each}
             </div>
           {:else}
             <div class="rows">
-              {#each items as item (item.id)}
+              {#each items as item, index (item.id)}
+                <div class="enter" style="animation-delay: {Math.min(index, 12) * 18}ms">
                 <ItemRow
                   {item}
                   viewer={settings.activePerson}
@@ -492,6 +518,7 @@
                   onopen={() => (openItemId = item.id)}
                   onwant={(person, value) => rate(item.id, person, value)}
                 />
+                </div>
               {/each}
             </div>
           {/if}
@@ -536,6 +563,9 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    /* Above the fixed decorative backdrop. */
+    position: relative;
+    z-index: 1;
   }
 
   .topbar {
@@ -544,7 +574,9 @@
     align-items: center;
     gap: 14px;
     padding: 9px 14px;
-    background: var(--surface);
+    /* Translucent so the themed backdrop reads through the chrome. */
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
   }
 
@@ -553,6 +585,25 @@
     font-size: 16px;
     letter-spacing: -0.02em;
     color: var(--accent);
+  }
+
+  .caret {
+    font-style: normal;
+    font-family: var(--font-numeric);
+    margin-left: 1px;
+  }
+
+  .whiskers {
+    font-style: normal;
+    font-size: 12px;
+    margin-left: 3px;
+    vertical-align: 2px;
+  }
+
+  .empty-art {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 6px;
   }
 
   .count {
@@ -610,7 +661,8 @@
     flex-shrink: 0;
     padding: 14px;
     border-right: 1px solid var(--border);
-    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(10px);
     overflow-y: auto;
     display: flex;
     flex-direction: column;

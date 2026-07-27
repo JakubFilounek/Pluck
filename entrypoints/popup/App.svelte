@@ -8,7 +8,10 @@
   import PersonToggle from '@/src/ui/PersonToggle.svelte';
   import TagChip from '@/src/ui/TagChip.svelte';
   import WantStars from '@/src/ui/WantStars.svelte';
-  import { applyTheme } from '@/src/ui/theme';
+  import CatArt from '@/src/ui/CatArt.svelte';
+  import TechArt from '@/src/ui/TechArt.svelte';
+  import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
+  import { applyAppearance } from '@/src/ui/theme';
   import type { CaptureCandidate, Category, Item, Tag, WantLevel } from '@/src/domain/types';
 
   /**
@@ -47,7 +50,7 @@
   async function initialise() {
     const loaded = await loadSettings();
     settings = loaded;
-    cleanupTheme = applyTheme(loaded.theme);
+    cleanupTheme = applyAppearance(loaded.theme, loaded.activePerson);
 
     await seedDefaults();
     [categories, tags] = await Promise.all([listCategories(), listTags()]);
@@ -81,6 +84,9 @@
 
   async function switchPerson(person: 'a' | 'b') {
     settings = await saveSettings({ activePerson: person });
+    // Repaint immediately: the whole palette and motif follow the active person.
+    cleanupTheme();
+    cleanupTheme = applyAppearance(settings.theme, person);
   }
 
   function toggleTag(tagId: string) {
@@ -131,9 +137,15 @@
 </script>
 
 <main>
+  {#if settings}
+    <ThemeBackdrop person={settings.activePerson} />
+  {/if}
+
   <header class="spread">
     <div class="row">
-      <span class="mark">Pluck</span>
+      <span class="mark">
+        Pluck{#if settings?.activePerson === 'a'}<i class="tech-caret caret">_</i>{/if}
+      </span>
     </div>
     {#if settings}
       <PersonToggle
@@ -173,7 +185,15 @@
       {#if candidate.imageUrl}
         <img class="preview" src={candidate.imageUrl} alt="" />
       {:else}
-        <div class="preview empty">No image</div>
+        <!-- No product image on the page: show the person's motif instead of an
+             apologetic grey box. -->
+        <div class="preview empty">
+          {#if settings?.activePerson === 'a'}
+            <TechArt size={130} subtle />
+          {:else}
+            <CatArt size={150} subtle />
+          {/if}
+        </div>
       {/if}
 
       <div class="fields">
@@ -260,18 +280,26 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
+    z-index: 1;
   }
 
   header {
     padding: 10px 12px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    backdrop-filter: blur(10px);
   }
 
   .mark {
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--accent);
+  }
+
+  .caret {
+    font-style: normal;
+    font-family: var(--font-numeric);
   }
 
   .pad {
@@ -301,6 +329,7 @@
     justify-content: center;
     color: var(--text-dim);
     font-size: 12px;
+    height: 150px;
   }
 
   .fields {
