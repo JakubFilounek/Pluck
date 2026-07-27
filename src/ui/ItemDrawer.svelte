@@ -3,6 +3,7 @@
   import { formatPrice, parsePrice } from '../extract/price';
   import { deleteItem, markBought, setStatus, setWant, updateItem } from '../data/mutations';
   import { otherPerson } from '../settings';
+  import Icon from './Icon.svelte';
   import TagChip from './TagChip.svelte';
   import WantStars from './WantStars.svelte';
 
@@ -102,7 +103,9 @@
 <aside class="drawer" aria-label="Item details">
   <header class="spread">
     <h2>Details</h2>
-    <button class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close details">✕</button>
+    <button class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close details">
+      <Icon name="close" size={15} />
+    </button>
   </header>
 
   <div class="scroll stack">
@@ -125,7 +128,8 @@
       <select id="d-category" bind:value={categoryId} onchange={persist}>
         <option value={undefined}>—</option>
         {#each categories as category (category.id)}
-          <option value={category.id}>{category.icon} {category.name}</option>
+          <!-- A native <option> can only hold text, so no icon here. -->
+          <option value={category.id}>{category.name}</option>
         {/each}
       </select>
     </div>
@@ -200,7 +204,9 @@
       {:else}
         <div class="row wrap">
           {#if item.status !== 'bought'}
-            <button class="btn btn-sm" onclick={() => (buying = true)}>✓ Mark bought</button>
+            <button class="btn btn-sm" onclick={() => (buying = true)}>
+              <Icon name="check" size={14} weight={2} /> Mark bought
+            </button>
           {/if}
           {#if item.status !== 'dropped'}
             <button class="btn btn-sm" onclick={() => changeStatus('dropped')}>
@@ -225,7 +231,10 @@
     </div>
 
     <div class="meta muted">
-      <a href={item.url} target="_blank" rel="noreferrer noopener">Open on {item.site} ↗</a>
+      <a class="ext" href={item.url} target="_blank" rel="noreferrer noopener">
+        Open on {item.site}
+        <Icon name="external" size={12} weight={2} />
+      </a>
       <span>Added by {personNames[item.addedBy]} on {new Date(item.createdAt).toLocaleDateString()}</span>
       {#if item.brand}<span>Brand: {item.brand}</span>{/if}
       {#if item.availability}<span>Availability when saved: {item.availability}</span>{/if}
@@ -316,6 +325,13 @@
     font-size: 11px;
     padding-top: 10px;
     border-top: 1px solid var(--border);
+  }
+
+  .ext {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
   }
 
   .danger-zone {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { formatPrice } from '../extract/price';
   import { otherPerson } from '../settings';
+  import Icon from './Icon.svelte';
   import TagChip from './TagChip.svelte';
   import WantStars from './WantStars.svelte';
   import type { Category, Item, PersonId, Tag, WantLevel } from '../domain/types';
@@ -29,7 +30,7 @@
     {#if item.imageUrl}
       <img class="thumb" src={item.imageUrl} alt="" loading="lazy" />
     {:else}
-      <div class="thumb empty">{category?.icon ?? '📦'}</div>
+      <div class="thumb empty"><Icon name={category?.icon ?? 'box'} size={40} weight={1.4} /></div>
     {/if}
 
     <label class="pick">
@@ -48,7 +49,7 @@
         <span class="badge badge-dropped">Dropped</span>
       {/if}
       {#if item.giftFor}
-        <span class="badge badge-gift">🎁 {personNames[item.giftFor]}</span>
+        <span class="badge badge-gift"><Icon name="gift" size={12} weight={2} />{personNames[item.giftFor]}</span>
       {/if}
     </div>
   </div>

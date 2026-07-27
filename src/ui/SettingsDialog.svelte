@@ -3,6 +3,8 @@
   import { createCategory, createTag, deleteCategory, deleteTag } from '../data/mutations';
   import { downloadBackup, importBackup, type ImportResult } from '../data/backup';
   import { saveSettings, type Settings } from '../settings';
+  import Icon from './Icon.svelte';
+  import { CATEGORY_ICONS } from './icons';
 
   type Props = {
     settings: Settings;
@@ -20,7 +22,7 @@
   /* svelte-ignore state_referenced_locally */
   let names = $state({ ...settings.personNames });
   let newCategory = $state('');
-  let newCategoryIcon = $state('📦');
+  let newCategoryIcon = $state<string>('box');
   let newTag = $state('');
   let newTagColor = $state('#b4531f');
   let importMessage = $state('');
@@ -34,8 +36,9 @@
 
   async function addCategory() {
     if (!newCategory.trim()) return;
-    await createCategory(newCategory.trim(), newCategoryIcon || '📦');
+    await createCategory(newCategory.trim(), newCategoryIcon);
     newCategory = '';
+    newCategoryIcon = 'box';
     onchange();
   }
 
@@ -82,7 +85,9 @@
   >
     <header class="spread">
       <h2>Settings</h2>
-      <button class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close settings">✕</button>
+      <button class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close settings">
+        <Icon name="close" size={15} />
+      </button>
     </header>
 
     <div class="scroll stack">
@@ -151,7 +156,7 @@
         <ul class="chips">
           {#each categories as category (category.id)}
             <li class="badge">
-              {category.icon}
+              <Icon name={category.icon} size={13} weight={1.9} />
               {category.name}
               <button
                 class="x"
@@ -159,13 +164,32 @@
                 onclick={async () => {
                   await deleteCategory(category.id);
                   onchange();
-                }}>✕</button
+                }}
               >
+                <Icon name="close" size={9} weight={2.6} />
+              </button>
             </li>
           {/each}
         </ul>
+
+        <!-- Pick from the icon set rather than typing a character: every icon here
+             inherits the theme colour and looks the same on any machine. -->
+        <div class="icon-picker" role="radiogroup" aria-label="Icon for the new category">
+          {#each CATEGORY_ICONS as iconName (iconName)}
+            <button
+              type="button"
+              class="icon-option"
+              class:on={newCategoryIcon === iconName}
+              role="radio"
+              aria-checked={newCategoryIcon === iconName}
+              aria-label={iconName}
+              onclick={() => (newCategoryIcon = iconName)}
+            >
+              <Icon name={iconName} size={16} />
+            </button>
+          {/each}
+        </div>
         <div class="add">
-          <input class="icon-input" bind:value={newCategoryIcon} aria-label="Category icon" />
           <input bind:value={newCategory} placeholder="New category" />
           <button class="btn btn-sm" onclick={addCategory}>Add</button>
         </div>
@@ -184,8 +208,10 @@
                 onclick={async () => {
                   await deleteTag(tag.id);
                   onchange();
-                }}>✕</button
+                }}
               >
+                <Icon name="close" size={9} weight={2.6} />
+              </button>
             </li>
           {/each}
         </ul>
@@ -308,11 +334,12 @@
   }
 
   .x {
+    display: inline-flex;
     border: none;
     padding: 0 0 0 3px;
-    font-size: 10px;
     opacity: 0.6;
     background: none;
+    line-height: 0;
   }
 
   .x:hover {
@@ -325,9 +352,36 @@
     gap: 6px;
   }
 
-  .icon-input {
-    width: 44px;
-    text-align: center;
+  .icon-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .icon-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    border: 1px solid transparent;
+  }
+
+  .icon-option:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+
+  .icon-option.on {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: var(--accent);
   }
 
   .color-input {

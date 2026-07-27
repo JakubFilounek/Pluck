@@ -75,7 +75,12 @@ export type Item = {
 export type Category = {
   id: string;
   name: string;
-  /** Emoji shown next to the name; purely cosmetic. */
+  /**
+   * Name of an icon in src/ui/icons.ts, e.g. 'laptop'. Deliberately typed as a plain
+   * string rather than IconName: this value is persisted and can arrive from a backup
+   * file written by another version, so the renderer treats unknown names as the
+   * fallback icon instead of the type system pretending they can't happen.
+   */
   icon: string;
   sortOrder: number;
 };

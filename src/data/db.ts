@@ -31,16 +31,18 @@ db.version(1).stores({
   thumbnails: 'id',
 });
 
+// `icon` holds a name from src/ui/icons.ts, not a glyph — see the note on the
+// Category type. Unknown names resolve to the box icon rather than rendering blank.
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat-electronics', name: 'Electronics', icon: '💻', sortOrder: 0 },
-  { id: 'cat-home', name: 'Home', icon: '🏠', sortOrder: 1 },
-  { id: 'cat-kitchen', name: 'Kitchen', icon: '🍳', sortOrder: 2 },
-  { id: 'cat-clothing', name: 'Clothing', icon: '👕', sortOrder: 3 },
-  { id: 'cat-beauty', name: 'Beauty', icon: '💄', sortOrder: 4 },
-  { id: 'cat-books', name: 'Books & Media', icon: '📚', sortOrder: 5 },
-  { id: 'cat-hobby', name: 'Hobby & Sport', icon: '🎨', sortOrder: 6 },
-  { id: 'cat-garden', name: 'Garden', icon: '🌱', sortOrder: 7 },
-  { id: 'cat-other', name: 'Other', icon: '📦', sortOrder: 8 },
+  { id: 'cat-electronics', name: 'Electronics', icon: 'laptop', sortOrder: 0 },
+  { id: 'cat-home', name: 'Home', icon: 'home', sortOrder: 1 },
+  { id: 'cat-kitchen', name: 'Kitchen', icon: 'kitchen', sortOrder: 2 },
+  { id: 'cat-clothing', name: 'Clothing', icon: 'clothing', sortOrder: 3 },
+  { id: 'cat-beauty', name: 'Beauty', icon: 'beauty', sortOrder: 4 },
+  { id: 'cat-books', name: 'Books & Media', icon: 'book', sortOrder: 5 },
+  { id: 'cat-hobby', name: 'Hobby & Sport', icon: 'hobby', sortOrder: 6 },
+  { id: 'cat-garden', name: 'Garden', icon: 'garden', sortOrder: 7 },
+  { id: 'cat-other', name: 'Other', icon: 'box', sortOrder: 8 },
 ];
 
 export const DEFAULT_TAGS: Tag[] = [

@@ -9,6 +9,7 @@
   import TagChip from '@/src/ui/TagChip.svelte';
   import WantStars from '@/src/ui/WantStars.svelte';
   import CatArt from '@/src/ui/CatArt.svelte';
+  import Icon from '@/src/ui/Icon.svelte';
   import TechArt from '@/src/ui/TechArt.svelte';
   import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
   import { applyAppearance } from '@/src/ui/theme';
@@ -165,7 +166,7 @@
     </div>
   {:else if phase === 'saved'}
     <div class="pad done">
-      <span class="tick">✓</span>
+      <span class="tick"><Icon name="check" size={30} weight={2.4} /></span>
       <p>{message}</p>
     </div>
   {:else if phase === 'duplicate' && duplicate}
@@ -212,7 +213,8 @@
             <select id="category" bind:value={categoryId}>
               <option value={undefined}>—</option>
               {#each categories as category (category.id)}
-                <option value={category.id}>{category.icon} {category.name}</option>
+                <!-- A native <option> can only hold text, so no icon here. -->
+                <option value={category.id}>{category.name}</option>
               {/each}
             </select>
           </div>
@@ -267,7 +269,9 @@
     </div>
 
     <footer class="spread">
-      <button class="btn btn-ghost btn-sm" onclick={openDashboard}>All items →</button>
+      <button class="btn btn-ghost btn-sm" onclick={openDashboard}>
+        All items <Icon name="arrowRight" size={13} weight={2} />
+      </button>
       <button class="btn btn-primary" onclick={save}>Save</button>
     </footer>
   {/if}
@@ -361,7 +365,7 @@
   }
 
   .tick {
-    font-size: 28px;
+    display: inline-flex;
     color: var(--ok);
   }
 

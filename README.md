@@ -85,6 +85,13 @@ WXT + Svelte 5 + TypeScript, Manifest V3, data in IndexedDB via Dexie.
 | `src/data/` | Dexie schema, queries, mutations, backup |
 | `src/ui/tokens.css` | Four palettes: person A/B × light/dark |
 | `src/ui/effects.css` | Keyframes, themed decoration, reduced-motion opt-out |
+| `src/ui/icons.ts` | The SVG icon set, drawn on a 24×24 grid |
+
+There are no emoji anywhere in the UI. Every icon is an SVG path in `icons.ts` rendered through
+`Icon.svelte`, so it inherits `currentColor` and looks identical on every machine — emoji would
+stay glossy full-colour inside the flat pastel and terminal-blue palettes. A category stores an
+icon *name* (`'laptop'`), not a glyph; unknown names fall back to the box icon, so a backup written
+by another version can't render a hole.
 
 Theming keys off two attributes on `<html>` — `data-person` (a/b) and `data-theme` (light/dark) —
 both set by `applyAppearance()` in `src/ui/theme.ts`. Adding a colour means adding it to all four

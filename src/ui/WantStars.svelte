@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
   import type { WantLevel } from '../domain/types';
 
   type Props = {
@@ -33,7 +34,11 @@
       aria-pressed={(value ?? 0) >= level}
       onclick={() => select(level)}
     >
-      ★
+      <Icon
+        name={(value ?? 0) >= level ? 'star' : 'star-empty'}
+        size={size === 'sm' ? 13 : 17}
+        weight={1.6}
+      />
     </button>
   {/each}
 </div>
@@ -45,21 +50,21 @@
   }
 
   .star {
+    display: inline-flex;
     padding: 0 1px;
-    font-size: 16px;
-    line-height: 1;
-    color: var(--border);
+    line-height: 0;
+    /* Unfilled stars are outlines in the dim colour, not a lighter fill — the shape
+       stays legible at 13px where a pale solid would disappear. */
+    color: var(--text-dim);
+    opacity: 0.55;
     background: none;
     border: none;
-    transition: transform 0.08s ease;
-  }
-
-  .sm .star {
-    font-size: 13px;
+    transition: transform 0.08s ease, opacity 0.12s ease, color 0.12s ease;
   }
 
   .star.filled {
     color: var(--want);
+    opacity: 1;
   }
 
   .star:not(.readonly):hover {

@@ -153,6 +153,7 @@ export async function bulkSetCategory(ids: string[], categoryId?: string): Promi
   });
 }
 
+/** `icon` is a name from src/ui/icons.ts, not a glyph. */
 export async function createCategory(name: string, icon: string): Promise<Category> {
   const maxOrder = (await db.categories.orderBy('sortOrder').last())?.sortOrder ?? -1;
   const category: Category = { id: newId('cat'), name, icon, sortOrder: maxOrder + 1 };

@@ -21,6 +21,7 @@
   import TagChip from '@/src/ui/TagChip.svelte';
   import WantStars from '@/src/ui/WantStars.svelte';
   import CatArt from '@/src/ui/CatArt.svelte';
+  import Icon from '@/src/ui/Icon.svelte';
   import TechArt from '@/src/ui/TechArt.svelte';
   import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
   import ThemeTransition from '@/src/ui/ThemeTransition.svelte';
@@ -185,7 +186,7 @@
       <div class="row">
         <span class="mark">
           Pluck{#if settings.activePerson === 'a'}<i class="tech-caret caret">_</i>{:else}<i
-              class="whiskers">🐾</i
+              class="whiskers"><Icon name="paw" size={12} /></i
             >{/if}
         </span>
         <span class="muted count">{items.length} shown</span>
@@ -211,21 +212,33 @@
             class="seg-btn"
             class:on={settings.viewMode === 'grid'}
             aria-pressed={settings.viewMode === 'grid'}
-            onclick={() => setViewMode('grid')}>▦</button
+            aria-label="Thumbnail view"
+            onclick={() => setViewMode('grid')}
           >
+            <Icon name="grid" size={15} />
+          </button>
           <button
             class="seg-btn"
             class:on={settings.viewMode === 'list'}
             aria-pressed={settings.viewMode === 'list'}
-            onclick={() => setViewMode('list')}>☰</button
+            aria-label="List view"
+            onclick={() => setViewMode('list')}
           >
+            <Icon name="list" size={15} />
+          </button>
         </div>
         <select bind:value={sort} onchange={refresh} aria-label="Sort by" class="sort">
           {#each Object.entries(SORT_LABELS) as [value, label] (value)}
             <option {value}>{label}</option>
           {/each}
         </select>
-        <button class="btn btn-ghost btn-sm" onclick={() => (showSettings = true)}>⚙</button>
+        <button
+          class="btn btn-ghost btn-sm"
+          onclick={() => (showSettings = true)}
+          aria-label="Settings"
+        >
+          <Icon name="settings" size={16} />
+        </button>
       </div>
     </header>
 
@@ -273,7 +286,7 @@
                 class:on={filters.categoryIds.includes(category.id)}
                 onclick={() => toggleCategory(category.id)}
               >
-                {category.icon}
+                <Icon name={category.icon} size={12} weight={1.9} />
                 {category.name}
               </button>
             {/each}
@@ -436,6 +449,7 @@
               >
                 <option value="">Set category…</option>
                 {#each categories as category (category.id)}
+                  <!-- Native <option> can't hold an SVG, so the select shows names only. -->
                   <option value={category.id}>{category.name}</option>
                 {/each}
               </select>
@@ -458,8 +472,8 @@
             {#if totalCount === 0}
               <h2>Nothing saved yet</h2>
               <p class="muted">
-                Open a product page and press the Pluck button, use Ctrl+Shift+S, or right-click →
-                Save this page to Pluck.
+                Open a product page and press the Pluck button, use Ctrl+Shift+S, or right-click and
+                choose "Save this page to Pluck".
               </p>
             {:else}
               <h2>Nothing matches</h2>
@@ -594,10 +608,9 @@
   }
 
   .whiskers {
-    font-style: normal;
-    font-size: 12px;
-    margin-left: 3px;
-    vertical-align: 2px;
+    display: inline-flex;
+    margin-left: 4px;
+    vertical-align: -1px;
   }
 
   .empty-art {
