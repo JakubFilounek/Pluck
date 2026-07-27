@@ -43,8 +43,15 @@ export default defineConfig({
     },
     browser_specific_settings: {
       gecko: {
-        id: 'pluck@local',
+        // Must be email-shaped and globally unique — AMO rejects bare labels, and this
+        // id is also the storage origin, so changing it later orphans existing data.
+        id: 'pluck@slyjacobthebeast.dev',
         strict_min_version: '121.0',
+        // Required by AMO for new submissions since 3 November 2025. Pluck sends
+        // nothing anywhere: no network calls, no analytics, no sync.
+        data_collection_permissions: {
+          required: ['none'],
+        },
       },
     },
   },
