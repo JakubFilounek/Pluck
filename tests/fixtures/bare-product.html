@@ -1,0 +1,34 @@
+<!-- Worst case: no JSON-LD, no microdata, no meta tags. Everything must come from DOM
+     heuristics. Includes the traps that matter — a header logo that must not win the
+     image contest, and a struck-through original price that must not win the price. -->
+<html lang="en">
+  <head>
+    <title>Standing Desk Lamp - Lightworks</title>
+  </head>
+  <body>
+    <header>
+      <img src="/assets/logo.svg" class="site-logo" alt="Lightworks logo" width="400" height="120" />
+      <nav><a href="/lamps">Lamps</a></nav>
+    </header>
+
+    <main>
+      <h1 class="product-title">Aurora Standing Desk Lamp</h1>
+
+      <div class="gallery">
+        <img src="/media/aurora-lamp-hero.jpg" alt="Aurora lamp" width="800" height="800" />
+        <img src="/media/aurora-lamp-detail.jpg" alt="Aurora lamp detail" width="200" height="200" />
+      </div>
+
+      <div class="pricing">
+        <span class="price price--old"><del>1 890 Kč</del></span>
+        <span class="price price--final">1 490 Kč</span>
+      </div>
+
+      <p>Dimmable LED desk lamp with adjustable colour temperature.</p>
+    </main>
+
+    <footer>
+      <img src="/assets/payment-icons.png" alt="payment methods" width="600" height="60" />
+    </footer>
+  </body>
+</html>

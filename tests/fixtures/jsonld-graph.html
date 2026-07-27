@@ -1,0 +1,51 @@
+<!-- Representative of a modern shop: JSON-LD inside @graph, offers as an array with
+     several variants, image as an array, brand as an object. Also carries OpenGraph
+     tags, so it exercises the merge (JSON-LD price wins, og:image fills the gap). -->
+<html lang="cs">
+  <head>
+    <title>Kávovar DeLonghi Magnifica S | Alza.cz</title>
+    <link rel="canonical" href="https://www.alza.cz/kavovar-delonghi-magnifica-s-d123.htm" />
+    <meta property="og:title" content="Kávovar DeLonghi Magnifica S" />
+    <meta property="og:image" content="/foto/kavovar-delonghi.jpg" />
+    <meta property="og:description" content="Automatický kávovar s mlýnkem." />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          { "@type": "WebSite", "name": "Alza.cz" },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Kávovary" }]
+          },
+          {
+            "@type": "Product",
+            "name": "DeLonghi Magnifica S ECAM 22.110.B",
+            "description": "Automatický kávovar s integrovaným mlýnkem a napěňovačem mléka.",
+            "image": ["https://cdn.alza.cz/foto/big/kavovar-1.jpg", "https://cdn.alza.cz/foto/kavovar-2.jpg"],
+            "brand": { "@type": "Brand", "name": "DeLonghi" },
+            "offers": [
+              {
+                "@type": "Offer",
+                "price": "10990.00",
+                "priceCurrency": "CZK",
+                "availability": "https://schema.org/InStock"
+              },
+              {
+                "@type": "Offer",
+                "price": "9490.00",
+                "priceCurrency": "CZK",
+                "availability": "https://schema.org/InStock"
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <script type="application/ld+json">
+      { this is deliberately malformed json and must not break the others }
+    </script>
+  </head>
+  <body>
+    <h1>Kávovar DeLonghi Magnifica S</h1>
+  </body>
+</html>
