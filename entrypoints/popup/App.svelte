@@ -108,7 +108,9 @@
       notes: notes.trim() || undefined,
     });
 
-    void browser.runtime.sendMessage({ type: 'pluck:items-changed' });
+    // Fire and forget: the badge refresh is cosmetic, and a message failing must not
+    // block or error the save that already succeeded.
+    browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
 
     phase = 'saved';
     message = `Saved to ${settings.personNames[settings.activePerson]}'s list.`;
@@ -116,7 +118,7 @@
   }
 
   async function openDashboard() {
-    await browser.runtime.sendMessage({ type: 'pluck:open-dashboard' });
+    await browser.runtime.sendMessage({ type: 'pluck:open-dashboard' }).catch(() => {});
     window.close();
   }
 

@@ -88,7 +88,8 @@
     const visible = new Set(items.map((item) => item.id));
     selected = new Set([...selected].filter((id) => visible.has(id)));
 
-    void browser.runtime.sendMessage({ type: 'pluck:items-changed' });
+    // Cosmetic badge refresh — never let a failed message break the render.
+    browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
   }
 
   async function switchPerson(person: PersonId) {
