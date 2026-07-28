@@ -1,36 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <g transform="translate(-24.124 -20.811) scale(1.32518)">
+  <g transform="translate(-16.100 -14.848) scale(1.25156)">
     <!--
     Source of truth for the extension icon. The PNGs under public/icon/ are generated
     from this by scripts/make-icons.mjs — edit here, never edit the PNGs.
 
-    The artwork's own bounding box is roughly x 24..109, y 29..99, which leaves it
-    off-centre and small on a 128 canvas. The generator centres and scales it to fill
-    the icon rather than baking that transform in here, so this file stays the
-    untouched original.
+    Two overlapping bookmarks, one per person: blue behind, pink in front.
+
+    The mask cuts a gap out of the blue wherever the pink crosses it. Without it the
+    two shapes butt directly together and merge into a single blob at toolbar size,
+    where the only thing separating them is a hue change. The gap is the pink path
+    stroked at 8 units, i.e. 4 units of clearance on each side.
+
+    The artwork is centred but does not fill the 128 canvas; the generator scales it
+    up rather than baking that transform in here, so this file stays the original.
   -->
-  <path fill="#0A63C4" d="
-    M24 29
-    C52 29 69 40 89 57
-    L81 67
-    C64 53 50 43 24 43
-    Z
-  "/>
+  <defs>
+    <mask id="pluck-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="#fff"/>
+      <path
+        d="M 58,32 Q 58,26 64,26 H 102 Q 108,26 108,32 V 108 L 83,90 L 58,108 Z"
+        fill="#000"
+        stroke="#000"
+        stroke-width="8"
+        stroke-linejoin="round"
+      />
+    </mask>
+  </defs>
 
-  <path fill="#0A63C4" d="
-    M24 85
-    C50 85 64 75 81 61
-    L89 71
-    C69 88 52 99 24 99
-    Z
-  "/>
-
-  <path fill="#DB5F97" d="
-    M87 64
-    L98 53
-    L109 64
-    L98 75
-    Z
-  "/>
+  <path
+    d="M 20,24 Q 20,18 26,18 H 64 Q 70,18 70,24 V 106 L 45,88 L 20,106 Z"
+    fill="#0A63C4"
+    mask="url(#pluck-gap)"
+  />
+  <path d="M 58,32 Q 58,26 64,26 H 102 Q 108,26 108,32 V 108 L 83,90 L 58,108 Z" fill="#DB5F97"/>
   </g>
 </svg>

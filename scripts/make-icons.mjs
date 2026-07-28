@@ -16,22 +16,23 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 /**
  * Per-size tuning.
  *
- * `bolden` is a stroke in viewBox units painted in each shape's own fill colour,
- * which thickens it without changing its form. At 16px the untuned mark renders its
- * arms about one pixel wide and the diamond as a two-pixel dot — legible only just.
- * Optically bolding the small sizes is normal icon preparation; the large ones are
- * left exactly as drawn.
+ * `bolden` strokes each shape in its own fill colour to thicken it. That was needed
+ * for an earlier logo drawn from thin strokes; the current one is solid shapes, where
+ * bolding only swells them into each other and rounds off the notches. It stays
+ * available for whatever the logo becomes next, but is off.
+ *
+ * Small sizes get less padding instead, so the mark simply fills more of the tile.
  */
 const SIZES = [
-  { size: 16, padding: 0.02, bolden: 5 },
-  { size: 32, padding: 0.04, bolden: 2.5 },
-  { size: 48, padding: 0.06, bolden: 0 },
+  { size: 16, padding: 0.01, bolden: 0 },
+  { size: 32, padding: 0.03, bolden: 0 },
+  { size: 48, padding: 0.05, bolden: 0 },
   { size: 96, padding: 0.06, bolden: 0 },
   { size: 128, padding: 0.06, bolden: 0 },
 ];
 
 /** Bounding box of the artwork inside the 128 viewBox, measured from the paths. */
-const ART = { x: 24, y: 29, width: 85, height: 70 };
+const ART = { x: 20, y: 18, width: 88, height: 90 };
 
 const source = await readFile(join(root, 'assets', 'logo.svg'), 'utf8');
 
