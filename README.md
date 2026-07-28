@@ -106,6 +106,12 @@ WXT + Svelte 5 + TypeScript, Manifest V3, data in IndexedDB via Dexie.
 | `src/ui/tokens.css` | Four palettes: person A/B × light/dark |
 | `src/ui/effects.css` | Keyframes, themed decoration, reduced-motion opt-out |
 | `src/ui/icons.ts` | The SVG icon set, drawn on a 24×24 grid |
+| `assets/logo.svg` | Extension logo — the source for `public/icon/*.png` |
+
+The icon PNGs are generated, never hand-edited. Change `assets/logo.svg`, then
+`npm run icons:preview` — it regenerates all five sizes and writes a magnified sheet of
+16/32/48 on both light and dark toolbar greys to `.output/icon-preview.png`. Check the 16px
+tile: that is the toolbar button, and it is where a logo that looks fine at 128 falls apart.
 
 There are no emoji anywhere in the UI. Every icon is an SVG path in `icons.ts` rendered through
 `Icon.svelte`, so it inherits `currentColor` and looks identical on every machine — emoji would
