@@ -11,7 +11,7 @@ export default defineConfig({
   manifest: {
     name: 'Pluck',
     short_name: 'Pluck',
-    description: 'Save products you want, rate them, tag them for occasions, mark them bought.',
+    description: 'Ukládej produkty, které chcete, hodnoť je, štítkuj podle příležitostí a označuj koupené.',
     // activeTab + scripting replaces the blanket <all_urls> host permission: Pluck can only
     // read the page you explicitly capture from. Broad host access is requested at runtime,
     // and only if optional features (image caching, price watching) get switched on.
@@ -24,16 +24,16 @@ export default defineConfig({
       128: '/icon/128.png',
     },
     action: {
-      default_title: 'Save to Pluck',
+      default_title: 'Uložit do Plucku',
     },
     commands: {
       _execute_action: {
         suggested_key: { default: 'Ctrl+Shift+S' },
-        description: 'Save the current page to Pluck',
+        description: 'Uložit aktuální stránku do Plucku',
       },
       'open-dashboard': {
         suggested_key: { default: 'Ctrl+Shift+E' },
-        description: 'Open the Pluck dashboard',
+        description: 'Otevřít přehled Plucku',
       },
     },
     // Product images are loaded straight from the shop's CDN, so extension pages need to be

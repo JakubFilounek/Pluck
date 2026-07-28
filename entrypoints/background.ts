@@ -14,13 +14,13 @@ async function buildMenus() {
 
   browser.contextMenus.create({
     id: MENU_SAVE_PAGE,
-    title: 'Save this page to Pluck',
+    title: 'Uložit stránku do Plucku',
     contexts: ['page', 'image', 'selection'],
   });
 
   browser.contextMenus.create({
     id: MENU_SAVE_LINK,
-    title: 'Save this link to Pluck',
+    title: 'Uložit odkaz do Plucku',
     contexts: ['link'],
   });
 }

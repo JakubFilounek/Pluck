@@ -73,6 +73,8 @@
   /** Id of the list/category/tag awaiting delete confirmation, if any. */
   let confirmingDelete = $state<string | null>(null);
   let missingDefaultCount = $state(0);
+  /** Non-empty when a sidebar action failed; shown rather than swallowed. */
+  let failure = $state('');
 
   /** Colours cycled through for new tags and lists, so they aren't all identical. */
   const SWATCHES = ['#c0392b', '#d35400', '#8e44ad', '#c2185b', '#2c7873', '#00838f'];
@@ -212,48 +214,65 @@
 
   /* ---------------------------------------------- managing the sidebar itself */
 
-  async function addList(name: string) {
+  /**
+   * Runs a sidebar mutation and reports anything it throws.
+   *
+   * Without this an exception rejects into nothing and the control simply appears
+   * dead — the same failure mode that made the popup's Add button look broken.
+   */
+  async function manage(action: () => Promise<void>) {
+    failure = '';
+
+    try {
+      await action();
+      await refresh();
+    } catch (error) {
+      failure = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    }
+  }
+
+  function addList(name: string) {
     if (!settings) return;
+    const person = settings.activePerson;
+
     // New lists start shared; making one private is a deliberate second step.
-    await createList(
-      name,
-      'heart',
-      SWATCHES[lists.length % SWATCHES.length]!,
-      'shared',
-      settings.activePerson,
-    );
-    await refresh();
-  }
-
-  async function toggleListPrivacy(list: PluckList) {
-    await updateList(list.id, {
-      visibility: list.visibility === 'private' ? 'shared' : 'private',
+    return manage(async () => {
+      await createList(name, 'heart', SWATCHES[lists.length % SWATCHES.length]!, 'shared', person);
     });
-    await refresh();
   }
 
-  async function addCategory(name: string) {
-    await createCategory(name, 'box');
-    await refresh();
+  function toggleListPrivacy(list: PluckList) {
+    return manage(() =>
+      updateList(list.id, {
+        visibility: list.visibility === 'private' ? 'shared' : 'private',
+      }),
+    );
   }
 
-  async function addTag(name: string) {
-    await createTag(name, SWATCHES[tags.length % SWATCHES.length]!);
-    await refresh();
+  function addCategory(name: string) {
+    return manage(async () => {
+      await createCategory(name, 'box');
+    });
   }
 
-  async function removeThing(kind: 'list' | 'category' | 'tag', id: string) {
-    if (kind === 'list') await deleteList(id);
-    else if (kind === 'category') await deleteCategory(id);
-    else await deleteTag(id);
-
-    confirmingDelete = null;
-    await refresh();
+  function addTag(name: string) {
+    return manage(async () => {
+      await createTag(name, SWATCHES[tags.length % SWATCHES.length]!);
+    });
   }
 
-  async function restore() {
-    await restoreDefaults();
-    await refresh();
+  function removeThing(kind: 'list' | 'category' | 'tag', id: string) {
+    return manage(async () => {
+      if (kind === 'list') await deleteList(id);
+      else if (kind === 'category') await deleteCategory(id);
+      else await deleteTag(id);
+
+      confirmingDelete = null;
+    });
+  }
+
+  function restore() {
+    return manage(() => restoreDefaults().then(() => undefined));
   }
 
   const openItem = $derived(items.find((item) => item.id === openItemId) ?? null);
@@ -364,6 +383,13 @@
 
     <div class="body">
       <aside class="sidebar">
+        {#if failure}
+          <p class="sidebar-error">
+            {failure}
+            <button class="btn btn-ghost btn-sm" onclick={() => (failure = '')}>Zavřít</button>
+          </p>
+        {/if}
+
         <section>
           <h3>
             Seznamy
@@ -440,7 +466,7 @@
           </h3>
           <div class="chips">
             {#each categories as category (category.id)}
-              <span class="pill-wrap">
+              <span class="pill-wrap" class:confirming={confirmingDelete === category.id}>
                 <button
                   class="pill"
                   class:on={filters.categoryIds.includes(category.id)}
@@ -450,7 +476,7 @@
                   {category.name}
                 </button>
                 {#if confirmingDelete === category.id}
-                  <button class="mini danger" onclick={() => removeThing('category', category.id)}>
+                  <button class="pill-x confirm" onclick={() => removeThing('category', category.id)}>
                     Smazat?
                   </button>
                 {:else}
@@ -483,7 +509,7 @@
           </h3>
           <div class="chips">
             {#each tags as tag (tag.id)}
-              <span class="pill-wrap">
+              <span class="pill-wrap" class:confirming={confirmingDelete === tag.id}>
                 <TagChip
                   {tag}
                   selected={filters.tagIds.includes(tag.id)}
@@ -491,7 +517,7 @@
                   onclick={() => toggleTagFilter(tag.id)}
                 />
                 {#if confirmingDelete === tag.id}
-                  <button class="mini danger" onclick={() => removeThing('tag', tag.id)}>
+                  <button class="pill-x confirm" onclick={() => removeThing('tag', tag.id)}>
                     Smazat?
                   </button>
                 {:else}
@@ -935,7 +961,9 @@
     border-radius: 4px;
     color: var(--text-dim);
     border: 1px solid transparent;
-    opacity: 0;
+    /* Visible but quiet, rather than fully hidden until hover — an invisible
+       control is one nobody finds. */
+    opacity: 0.5;
     transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
   }
 
@@ -965,27 +993,29 @@
     border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   }
 
+  /* The delete control sits inline rather than floating over the chip's corner.
+     Absolutely positioned and hover-only, it was a 14px target half outside its
+     parent — easy to miss entirely, which read as "clicking X does nothing". */
   .pill-wrap {
-    position: relative;
     display: inline-flex;
     align-items: center;
+    gap: 2px;
   }
 
   .pill-x {
-    position: absolute;
-    top: -5px;
-    right: -5px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 3px;
+    border-radius: 5px;
+    background: transparent;
+    border: 1px solid transparent;
     color: var(--text-dim);
-    opacity: 0;
-    transition: opacity 0.12s ease;
+    font-size: 10px;
+    opacity: 0.55;
+    transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
   }
 
   .pill-wrap:hover .pill-x,
@@ -995,7 +1025,15 @@
 
   .pill-x:hover {
     color: var(--danger);
-    border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+  }
+
+  .pill-x.confirm {
+    opacity: 1;
+    padding: 0 6px;
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+    font-weight: 600;
   }
 
   .warn {
@@ -1003,6 +1041,18 @@
     font-size: 10.5px;
     line-height: 1.4;
     color: var(--text-dim);
+  }
+
+  .sidebar-error {
+    margin: 0;
+    padding: 7px 9px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+    border-radius: var(--radius-sm);
+    word-break: break-word;
   }
 
   .restore {

@@ -27,9 +27,14 @@
     open = true;
     value = '';
     cancelled = false;
-    // Focus after the input exists in the DOM.
-    queueMicrotask(() => input?.focus());
   }
+
+  // Focus once the input actually exists. queueMicrotask ran before Svelte had
+  // rendered it, so `input` was still null and the field opened unfocused — typing
+  // went nowhere and, never having been focused, it never blurred to commit either.
+  $effect(() => {
+    if (open && input) input.focus();
+  });
 
   async function commit() {
     if (cancelled) return;

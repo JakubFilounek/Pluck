@@ -6,11 +6,13 @@
   /**
    * Full-screen wipe played when the active person changes.
    *
-   * Two independent ways to end — the CSS animation's own `animationend`, and a
-   * hard timeout — because a veil that fails to dismiss covers the entire UI and
-   * needs a reload to clear. Belt and braces is cheap here; the earlier versions
-   * managed to get stuck twice, once by clearing its timers from an effect cleanup
-   * and once by racing a restart against animationend.
+   * The timer deliberately lives outside the effect and is NOT cleared from an effect
+   * cleanup. That pattern has stranded this veil twice: Svelte runs cleanup on any
+   * re-run, not only on unmount, so an unrelated re-render cancelled the dismissal
+   * and then took the `person === previous` early return — leaving the veil, and its
+   * cats, covering the whole UI until a reload.
+   *
+   * It is cleared in exactly two places: when a new wipe starts, and on unmount.
    */
 
   type Props = { person: PersonId };
@@ -25,7 +27,14 @@
   /* svelte-ignore state_referenced_locally */
   let previous: PersonId = person;
 
+  let failsafe: ReturnType<typeof setTimeout> | undefined;
   const DURATION_MS = 1150;
+
+  function dismiss() {
+    clearTimeout(failsafe);
+    failsafe = undefined;
+    showing = false;
+  }
 
   $effect(() => {
     if (person === previous) return;
@@ -35,16 +44,19 @@
     run += 1;
     showing = true;
 
-    // Safety net: if animationend never arrives — reduced motion, a backgrounded
-    // tab, an interrupted animation — the veil still goes away on its own.
-    const failsafe = setTimeout(() => (showing = false), DURATION_MS + 400);
-    return () => clearTimeout(failsafe);
+    // Belt and braces alongside animationend: a backgrounded tab, reduced motion or
+    // an interrupted animation must not be able to leave this up.
+    clearTimeout(failsafe);
+    failsafe = setTimeout(dismiss, DURATION_MS + 400);
   });
+
+  // Unmount only — never on a re-run.
+  $effect(() => () => clearTimeout(failsafe));
 </script>
 
 {#if showing}
   {#key run}
-    <div class="switch-veil" aria-hidden="true" onanimationend={() => (showing = false)}>
+    <div class="switch-veil" aria-hidden="true" onanimationend={dismiss}>
       <div class="emblem">
         {#if shown === 'a'}
           <TechScene width={340} still />

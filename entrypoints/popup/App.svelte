@@ -454,7 +454,7 @@
 
     <footer class="spread">
       <button class="btn btn-ghost btn-sm" onclick={openDashboard}>
-        Vše <Icon name="arrowRight" size={13} weight={2} />
+        Přehled <Icon name="arrowRight" size={13} weight={2} />
       </button>
       {#if existing}
         <button class="btn add added" onclick={removeExisting} disabled={busy}>
