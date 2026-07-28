@@ -54,13 +54,24 @@ restart, and the `xpinstall.signatures.required` pref does nothing on Release or
 
 1. Get a JWT issuer and secret from
    [addons.mozilla.org/developers/addon/api/key](https://addons.mozilla.org/en-US/developers/addon/api/key/).
-2. Put them in the environment (`web-ext` reads these names automatically, which keeps the secret
-   out of your shell history):
+   The **issuer** is the short `user:12345678:123` string and is always visible on that page.
+   The **secret** is 64 hex characters and is shown only once. Note that Mozilla calls the
+   issuer the "API key", so `WEB_EXT_API_KEY` wants the *short* one — swapping them is the
+   easiest mistake to make here, and `npm run sign` checks for it before doing anything.
+
+2. Store them for good:
 
    ```powershell
-   $env:WEB_EXT_API_KEY = 'user:12345678:123'
-   $env:WEB_EXT_API_SECRET = 'your-secret'
+   [Environment]::SetEnvironmentVariable('WEB_EXT_API_KEY', 'user:12345678:123', 'User')
+   [Environment]::SetEnvironmentVariable('WEB_EXT_API_SECRET', '<64 hex chars>', 'User')
    ```
+
+   On Windows the signing script reads these straight from the registry if the shell doesn't
+   have them, so you don't need to restart your terminal app. (Windows Terminal and VS Code
+   snapshot the environment when the *application* launches — a new tab inherits the stale
+   copy, which is why "open a new terminal" often isn't enough.)
+
+   Check them any time with `npm run sign:check`, which validates and stops.
 
 3. `npm run sign` — builds, uploads, waits for automated review, and writes a signed `.xpi` to
    `.output/signed/`.
