@@ -28,6 +28,7 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@types/node": "^22.13.5",
     "@wxt-dev/module-svelte": "^2.0.2",
+    "fake-indexeddb": "^6.2.5",
     "happy-dom": "^17.1.8",
     "sharp": "^0.35.3",
     "svelte": "^5.20.4",

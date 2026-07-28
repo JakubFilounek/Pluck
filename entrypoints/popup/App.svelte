@@ -1,7 +1,7 @@
 <script lang="ts">
   import { captureActiveTab } from '@/src/capture';
   import { seedDefaults } from '@/src/data/db';
-  import { createItem } from '@/src/data/mutations';
+  import { createItem, deleteItem } from '@/src/data/mutations';
   import { findDuplicate, listCategories, listTags } from '@/src/data/queries';
   import { formatPrice, parsePrice } from '@/src/extract';
   import { otherPerson, loadSettings, saveSettings, type Settings } from '@/src/settings';
@@ -21,15 +21,22 @@
    * edit here instead of becoming a bad row you find months later.
    */
 
-  type Phase = 'loading' | 'ready' | 'saved' | 'duplicate' | 'error';
+  type Phase = 'loading' | 'ready' | 'saved' | 'removed' | 'error';
 
   let phase = $state<Phase>('loading');
   let message = $state('');
+  /** Non-empty when something failed; always shown rather than swallowed. */
+  let failure = $state('');
+  let busy = $state(false);
   let settings = $state<Settings | null>(null);
   let candidate = $state<CaptureCandidate | null>(null);
   let categories = $state<Category[]>([]);
   let tags = $state<Tag[]>([]);
-  let duplicate = $state<Item | null>(null);
+  /**
+   * The already-saved copy of this page, if the current person can see one. A copy
+   * that is a gift for them stays invisible here — see findDuplicate.
+   */
+  let existing = $state<Item | null>(null);
 
   // Editable form state, seeded from the capture.
   let title = $state('');
@@ -48,39 +55,50 @@
     return () => cleanupTheme();
   });
 
+  /** Turns anything thrown into a readable line instead of a silent no-op. */
+  function describe(error: unknown): string {
+    if (error instanceof Error) return `${error.name}: ${error.message}`;
+    return String(error);
+  }
+
   async function initialise() {
-    const loaded = await loadSettings();
-    settings = loaded;
-    cleanupTheme = applyAppearance(loaded.theme, loaded.activePerson);
+    try {
+      const loaded = await loadSettings();
+      settings = loaded;
+      cleanupTheme = applyAppearance(loaded.theme, loaded.activePerson);
 
-    await seedDefaults();
-    [categories, tags] = await Promise.all([listCategories(), listTags()]);
+      await seedDefaults();
+      [categories, tags] = await Promise.all([listCategories(), listTags()]);
 
-    const result = await captureActiveTab(loaded.defaultCurrency);
+      const result = await captureActiveTab(loaded.defaultCurrency);
 
-    if (!result.ok) {
+      if (!result.ok) {
+        phase = 'error';
+        message = result.reason;
+        return;
+      }
+
+      candidate = result.candidate;
+      title = result.candidate.title;
+      priceText = result.candidate.price?.raw ?? '';
+      notes = result.candidate.notes ?? '';
+
+      await refreshExisting();
+      phase = 'ready';
+    } catch (error) {
       phase = 'error';
-      message = result.reason;
-      return;
+      message = 'Pluck could not read this page.';
+      failure = describe(error);
     }
+  }
 
-    candidate = result.candidate;
-    title = result.candidate.title;
-    priceText = result.candidate.price?.raw ?? '';
-    notes = result.candidate.notes ?? '';
+  async function refreshExisting() {
+    if (!candidate || !settings) return;
 
-    const existing = await findDuplicate(
-      { viewer: loaded.activePerson, surpriseMode: loaded.surpriseMode },
-      result.candidate.canonicalUrl,
-    );
-
-    if (existing) {
-      duplicate = existing;
-      phase = 'duplicate';
-      return;
-    }
-
-    phase = 'ready';
+    existing = (await findDuplicate(
+      { viewer: settings.activePerson, surpriseMode: settings.surpriseMode },
+      candidate.canonicalUrl,
+    )) ?? null;
   }
 
   async function switchPerson(person: 'a' | 'b') {
@@ -97,31 +115,65 @@
   }
 
   async function save() {
-    if (!candidate || !settings) return;
+    if (!candidate || !settings || busy) return;
 
-    await createItem({
-      candidate: {
-        ...candidate,
-        title: title.trim() || candidate.title,
-        // Re-parse rather than keeping the original: the user may have corrected a
-        // mis-detected price by hand.
-        price: parsePrice(priceText, settings.defaultCurrency),
-      },
-      addedBy: settings.activePerson,
-      want: want || undefined,
-      categoryId,
-      tagIds: selectedTags,
-      giftFor: giftFor || undefined,
-      notes: notes.trim() || undefined,
-    });
+    busy = true;
+    failure = '';
 
-    // Fire and forget: the badge refresh is cosmetic, and a message failing must not
-    // block or error the save that already succeeded.
-    browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
+    try {
+      await createItem({
+        candidate: {
+          ...candidate,
+          title: title.trim() || candidate.title,
+          // Re-parse rather than keeping the original: the user may have corrected a
+          // mis-detected price by hand.
+          price: parsePrice(priceText, settings.defaultCurrency),
+        },
+        addedBy: settings.activePerson,
+        want: want || undefined,
+        categoryId,
+        tagIds: selectedTags,
+        giftFor: giftFor || undefined,
+        notes: notes.trim() || undefined,
+      });
 
-    phase = 'saved';
-    message = `Added to ${settings.personNames[settings.activePerson]}'s list.`;
-    setTimeout(() => window.close(), 900);
+      // Fire and forget: the badge refresh is cosmetic, and a message failing must
+      // not block or error the save that already succeeded.
+      browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
+
+      phase = 'saved';
+      message = `Added to ${settings.personNames[settings.activePerson]}'s list.`;
+      setTimeout(() => window.close(), 900);
+    } catch (error) {
+      // Previously this rejected into nothing and the button simply looked dead.
+      failure = `Could not add it — ${describe(error)}`;
+    } finally {
+      busy = false;
+    }
+  }
+
+  /** Removes the already-saved copy, putting the popup back into add mode. */
+  async function removeExisting() {
+    if (!existing || busy) return;
+
+    busy = true;
+    failure = '';
+
+    try {
+      await deleteItem(existing.id);
+      browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
+
+      existing = null;
+      phase = 'removed';
+      message = 'Removed. You can add it again below.';
+      setTimeout(() => {
+        if (phase === 'removed') phase = 'ready';
+      }, 1400);
+    } catch (error) {
+      failure = `Could not remove it — ${describe(error)}`;
+    } finally {
+      busy = false;
+    }
   }
 
   async function openDashboard() {
@@ -161,7 +213,8 @@
     <p class="muted pad">Reading this page…</p>
   {:else if phase === 'error'}
     <div class="pad stack">
-      <p class="muted">{message}</p>
+      <p>{message}</p>
+      {#if failure}<p class="failure">{failure}</p>{/if}
       <button class="btn" onclick={openDashboard}>Open dashboard</button>
     </div>
   {:else if phase === 'saved'}
@@ -169,28 +222,41 @@
       <span class="tick"><Icon name="check" size={30} weight={2.4} /></span>
       <p>{message}</p>
     </div>
-  {:else if phase === 'duplicate' && duplicate}
-    <div class="pad stack">
-      <p class="muted">You already saved this one.</p>
-      <div class="dupe card">
-        <strong class="clamp-2">{duplicate.title}</strong>
-        <span class="muted">{duplicate.site}{duplicate.price ? ` · ${formatPrice(duplicate.price)}` : ''}</span>
-      </div>
-      <div class="row">
-        <button class="btn btn-primary" onclick={openDashboard}>Open in dashboard</button>
-        <button class="btn" onclick={() => (phase = 'ready')}>Add a second copy</button>
-      </div>
-    </div>
   {:else if candidate}
     <div class="capture">
-      <!-- Say plainly what is about to happen. "Save" on its own read as saving
-           something generic rather than adding this page as an item. -->
-      <div class="intro">
-        <h1>Add this product</h1>
-        <p class="muted truncate">
-          from <strong>{candidate.site}</strong> · check the details, then add it
-        </p>
-      </div>
+      {#if existing}
+        <!-- Already saved. Stated up front with a filled green check, because the
+             thing you most need to know here is "don't add this twice". -->
+        <div class="intro row">
+          <span class="check-badge"><Icon name="check" size={13} weight={3} /></span>
+          <div class="min">
+            <h1>Already added</h1>
+            <p class="muted truncate">
+              on {new Date(existing.createdAt).toLocaleDateString()}
+              {#if existing.giftFor && settings}
+                · gift for {settings.personNames[existing.giftFor]}
+              {/if}
+            </p>
+          </div>
+        </div>
+      {:else}
+        <!-- Say plainly what is about to happen. "Save" on its own read as saving
+             something generic rather than adding this page as an item. -->
+        <div class="intro">
+          <h1>Add this product</h1>
+          <p class="muted truncate">
+            from <strong>{candidate.site}</strong> · check the details, then add it
+          </p>
+        </div>
+      {/if}
+
+      {#if phase === 'removed'}
+        <p class="notice">{message}</p>
+      {/if}
+
+      {#if failure}
+        <p class="failure">{failure}</p>
+      {/if}
 
       {#if candidate.source === 'fallback'}
         <p class="notice">
@@ -288,10 +354,17 @@
       <button class="btn btn-ghost btn-sm" onclick={openDashboard}>
         All items <Icon name="arrowRight" size={13} weight={2} />
       </button>
-      <button class="btn btn-primary add" onclick={save}>
-        <Icon name="plus" size={15} weight={2.2} />
-        Add to {settings ? settings.personNames[settings.activePerson] : 'my'} list
-      </button>
+      {#if existing}
+        <button class="btn add added" onclick={removeExisting} disabled={busy}>
+          <Icon name="check" size={15} weight={2.4} />
+          Added — click to remove
+        </button>
+      {:else}
+        <button class="btn btn-primary add" onclick={save} disabled={busy}>
+          <Icon name="plus" size={15} weight={2.2} />
+          Add to {settings ? settings.personNames[settings.activePerson] : 'my'} list
+        </button>
+      {/if}
     </footer>
   {/if}
 </main>
@@ -361,6 +434,46 @@
     font-weight: 600;
   }
 
+  .added {
+    background: var(--ok);
+    border-color: var(--ok);
+    color: #fff;
+  }
+
+  .added:hover:not(:disabled) {
+    filter: brightness(1.08);
+    background: var(--ok);
+  }
+
+  /* Filled green disc with a white tick — reads as "done" at a glance. */
+  .check-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--ok);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .min {
+    min-width: 0;
+  }
+
+  .failure {
+    margin: 0;
+    padding: 7px 9px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+    border-radius: var(--radius-sm);
+    word-break: break-word;
+  }
+
   .preview {
     width: 100%;
     height: 130px;
@@ -412,11 +525,4 @@
     color: var(--ok);
   }
 
-  .dupe {
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 13px;
-  }
 </style>

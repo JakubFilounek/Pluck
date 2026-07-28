@@ -73,3 +73,51 @@ export async function seedDefaults(): Promise<void> {
     await db.tags.bulkAdd(DEFAULT_TAGS);
   }
 }
+
+/**
+ * Which of the shipped defaults are no longer present.
+ *
+ * Deleting a default is easy and undoing it was impossible — seedDefaults only fills
+ * an empty table, so once you had one category of your own the defaults could never
+ * come back. This is what the restore button in settings offers.
+ */
+export async function missingDefaults(): Promise<{
+  categories: Category[];
+  tags: Tag[];
+}> {
+  const [existingCategories, existingTags] = await Promise.all([
+    db.categories.toArray(),
+    db.tags.toArray(),
+  ]);
+
+  const categoryIds = new Set(existingCategories.map((category) => category.id));
+  const tagIds = new Set(existingTags.map((tag) => tag.id));
+
+  return {
+    categories: DEFAULT_CATEGORIES.filter((category) => !categoryIds.has(category.id)),
+    tags: DEFAULT_TAGS.filter((tag) => !tagIds.has(tag.id)),
+  };
+}
+
+/** Puts back every deleted default, leaving anything you have added untouched. */
+export async function restoreDefaults(): Promise<{ categories: number; tags: number }> {
+  const missing = await missingDefaults();
+
+  // Re-added at the end rather than at their original sortOrder, so a restore never
+  // reshuffles the ordering you have arranged since.
+  const maxCategoryOrder = (await db.categories.orderBy('sortOrder').last())?.sortOrder ?? -1;
+  const maxTagOrder = (await db.tags.orderBy('sortOrder').last())?.sortOrder ?? -1;
+
+  await db.categories.bulkAdd(
+    missing.categories.map((category, index) => ({
+      ...category,
+      sortOrder: maxCategoryOrder + 1 + index,
+    })),
+  );
+
+  await db.tags.bulkAdd(
+    missing.tags.map((tag, index) => ({ ...tag, sortOrder: maxTagOrder + 1 + index })),
+  );
+
+  return { categories: missing.categories.length, tags: missing.tags.length };
+}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { PERSON_IDS, type Category, type PersonId, type Tag } from '../domain/types';
   import { createCategory, createTag, deleteCategory, deleteTag } from '../data/mutations';
+  import { missingDefaults, restoreDefaults } from '../data/db';
   import { downloadBackup, importBackup, type ImportResult } from '../data/backup';
   import { saveSettings, type Settings } from '../settings';
   import Icon from './Icon.svelte';
@@ -28,6 +29,25 @@
   let importMessage = $state('');
   let importError = $state('');
   let fileInput = $state<HTMLInputElement | null>(null);
+
+  // How many shipped defaults have been deleted, so the restore offer can name them.
+  let missingCategories = $state(0);
+  let missingTags = $state(0);
+
+  $effect(() => {
+    // Re-count whenever the lists change, so the offer disappears once restored.
+    void categories;
+    void tags;
+    void missingDefaults().then((missing) => {
+      missingCategories = missing.categories.length;
+      missingTags = missing.tags.length;
+    });
+  });
+
+  async function restore() {
+    await restoreDefaults();
+    onchange();
+  }
 
   async function patch(update: Partial<Settings>) {
     await saveSettings(update);
@@ -221,6 +241,19 @@
           <button class="btn btn-sm" onclick={addTag}>Add</button>
         </div>
       </section>
+
+      {#if missingCategories > 0 || missingTags > 0}
+        <section>
+          <h3>Restore defaults</h3>
+          <p class="hint">
+            {missingCategories} default categories and {missingTags} default tags have been
+            deleted. Putting them back leaves anything you added untouched.
+          </p>
+          <div class="row">
+            <button class="btn btn-sm" onclick={restore}>Put the missing defaults back</button>
+          </div>
+        </section>
+      {/if}
 
       <section>
         <h3>Backup</h3>
