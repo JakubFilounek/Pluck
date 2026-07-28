@@ -63,14 +63,13 @@
   50% { box-shadow: 0 0 14px 0 var(--glow); }
 }
 
-@keyframes wipe-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
-
-@keyframes wipe-out {
-  from { transform: translateX(0); }
-  to { transform: translateX(100%); }
+/* One animation covering wipe-in, hold and wipe-out, so the veil's end is signalled
+   by a single animationend and can never be left half-played. */
+@keyframes veil-sweep {
+  0% { transform: translateX(-100%); }
+  26% { transform: translateX(0); }
+  62% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
 }
 
 @keyframes glitch-shift {
@@ -238,12 +237,8 @@ body {
   background: linear-gradient(115deg, var(--bg), var(--accent-soft), var(--bg));
 }
 
-.switch-veil.leaving {
-  animation: wipe-out 0.42s cubic-bezier(0.7, 0, 0.84, 0) forwards;
-}
-
-.switch-veil:not(.leaving) {
-  animation: wipe-in 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+.switch-veil {
+  animation: veil-sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) both;
 }
 
 .switch-veil .emblem {

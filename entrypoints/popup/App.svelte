@@ -8,9 +8,9 @@
   import PersonToggle from '@/src/ui/PersonToggle.svelte';
   import TagChip from '@/src/ui/TagChip.svelte';
   import WantStars from '@/src/ui/WantStars.svelte';
-  import CatArt from '@/src/ui/CatArt.svelte';
+  import CatScene from '@/src/ui/CatScene.svelte';
   import Icon from '@/src/ui/Icon.svelte';
-  import TechArt from '@/src/ui/TechArt.svelte';
+  import TechScene from '@/src/ui/TechScene.svelte';
   import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
   import { applyAppearance } from '@/src/ui/theme';
   import type { CaptureCandidate, Category, Item, Tag, WantLevel } from '@/src/domain/types';
@@ -120,7 +120,7 @@
     browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
 
     phase = 'saved';
-    message = `Saved to ${settings.personNames[settings.activePerson]}'s list.`;
+    message = `Added to ${settings.personNames[settings.activePerson]}'s list.`;
     setTimeout(() => window.close(), 900);
   }
 
@@ -178,21 +178,37 @@
       </div>
       <div class="row">
         <button class="btn btn-primary" onclick={openDashboard}>Open in dashboard</button>
-        <button class="btn" onclick={() => (phase = 'ready')}>Save anyway</button>
+        <button class="btn" onclick={() => (phase = 'ready')}>Add a second copy</button>
       </div>
     </div>
   {:else if candidate}
     <div class="capture">
+      <!-- Say plainly what is about to happen. "Save" on its own read as saving
+           something generic rather than adding this page as an item. -->
+      <div class="intro">
+        <h1>Add this product</h1>
+        <p class="muted truncate">
+          from <strong>{candidate.site}</strong> · check the details, then add it
+        </p>
+      </div>
+
+      {#if candidate.source === 'fallback'}
+        <p class="notice">
+          Couldn't read this page's details — only its title and link came through. Fill in
+          anything you want by hand below.
+        </p>
+      {/if}
+
       {#if candidate.imageUrl}
         <img class="preview" src={candidate.imageUrl} alt="" />
       {:else}
         <!-- No product image on the page: show the person's motif instead of an
-             apologetic grey box. -->
+             apologetic grey box. Static here — a moving scene next to a form is noise. -->
         <div class="preview empty">
           {#if settings?.activePerson === 'a'}
-            <TechArt size={130} subtle />
+            <TechScene width={220} still />
           {:else}
-            <CatArt size={150} subtle />
+            <CatScene width={230} still />
           {/if}
         </div>
       {/if}
@@ -272,7 +288,10 @@
       <button class="btn btn-ghost btn-sm" onclick={openDashboard}>
         All items <Icon name="arrowRight" size={13} weight={2} />
       </button>
-      <button class="btn btn-primary" onclick={save}>Save</button>
+      <button class="btn btn-primary add" onclick={save}>
+        <Icon name="plus" size={15} weight={2.2} />
+        Add to {settings ? settings.personNames[settings.activePerson] : 'my'} list
+      </button>
     </footer>
   {/if}
 </main>
@@ -316,6 +335,30 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .intro h1 {
+    font-size: 15px;
+  }
+
+  .intro p {
+    margin: 2px 0 0;
+    font-size: 12px;
+  }
+
+  .notice {
+    margin: 0;
+    padding: 7px 9px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-ghost);
+    border-radius: var(--radius-sm);
+  }
+
+  .add {
+    font-weight: 600;
   }
 
   .preview {

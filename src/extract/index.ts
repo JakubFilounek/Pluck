@@ -52,30 +52,55 @@ function preferredUrl(doc: Document, pageUrl: string): string {
   return pageUrl;
 }
 
-/** Ignores spacing and punctuation so 'Maker Studio' matches the site label 'Makerstudio'. */
-function looseEquals(left: string, right: string): boolean {
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return normalize(left) === normalize(right) && normalize(left).length > 0;
+function normalizeName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * True when the title's trailing segment is just the shop naming itself.
+ *
+ * Compared against both the display label and the full hostname, because titles end
+ * with either — "… | Alza.cz" against a site label of "Alza" has to match, and did
+ * not when only the label was checked.
+ */
+function isShopSuffix(tail: string, site: string, hostname: string): boolean {
+  const candidate = normalizeName(tail);
+  if (!candidate) return false;
+
+  const label = normalizeName(site);
+  const host = normalizeName(hostname);
+
+  if (candidate === label || candidate === host) return true;
+
+  // "Alza.cz" against label "alza": same name plus a domain suffix, nothing more.
+  return label.length > 2 && candidate.startsWith(label) && candidate.length <= label.length + 4;
 }
 
 /**
  * Strips the trailing "| Shop Name" that page titles almost always carry.
  *
- * Only removes the tail when it actually matches the shop's own name — a blanket
- * "drop everything after the last pipe" rule would happily eat real product detail
- * out of titles like "Nike Air Max | Blue".
+ * Only removes the tail when it actually names the shop — a blanket "drop everything
+ * after the last separator" rule would happily eat real product detail out of titles
+ * like "Nike Air Max | Blue".
  */
-function cleanTitle(title: string | undefined, site: string): string | undefined {
+function cleanTitle(
+  title: string | undefined,
+  site: string,
+  hostname: string,
+): string | undefined {
   if (!title) return undefined;
 
-  const collapsed = title.replace(/\s+/g, ' ').trim();
-  const match = /^(.*?)\s*[|\-–—·»:]\s*([^|\-–—·»:]+)$/.exec(collapsed);
+  let collapsed = title.replace(/\s+/g, ' ').trim();
 
-  if (match?.[1] && match[2] && looseEquals(match[2], site)) {
-    return match[1].trim() || collapsed;
+  // Loop: some shops stack two suffixes, e.g. "Product - Category | Alza.cz".
+  for (let pass = 0; pass < 2; pass += 1) {
+    const match = /^(.*?)\s*[|\-–—·»]\s*([^|\-–—·»]+)$/.exec(collapsed);
+    if (!match?.[1] || !match[2] || !isShopSuffix(match[2], site, hostname)) break;
+
+    collapsed = match[1].trim();
   }
 
-  return collapsed;
+  return collapsed || title.trim();
 }
 
 export function extractCandidate(
@@ -85,6 +110,13 @@ export function extractCandidate(
 ): CaptureCandidate {
   const url = preferredUrl(doc, pageUrl);
   const site = siteNameFromUrl(url);
+
+  let hostname = '';
+  try {
+    hostname = new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    // Unparseable URL — suffix stripping falls back to the site label alone.
+  }
 
   const merged: PartialCandidate = {};
   let source: CaptureSource = 'fallback';
@@ -117,7 +149,10 @@ export function extractCandidate(
   return {
     // Chained with || rather than ??: an extractor that returns an empty string
     // must fall through to the next fallback, not be accepted as a title.
-    title: cleanTitle(merged.title, site) || doc.title?.trim() || 'Untitled item',
+    title:
+      cleanTitle(merged.title, site, hostname) ||
+      cleanTitle(doc.title, site, hostname) ||
+      'Untitled item',
     url,
     canonicalUrl: canonicalizeUrl(url),
     site,

@@ -62,16 +62,21 @@ export default defineConfig({
   },
   hooks: {
     /**
-     * Strip the host_permissions WXT infers from the content script's match pattern.
+     * Belt and braces: assert no host permission ever creeps back in.
      *
-     * The content script is registered as 'runtime', so WXT assumes it will be
-     * registered via browser.scripting.registerContentScripts, which would indeed need
-     * <all_urls>. Pluck never does that — it only injects on demand from a user
-     * gesture, which activeTab already covers. Without this hook the extension would
-     * ask for permanent access to every website at install time and gain nothing.
+     * Capture injects into the current tab from a user gesture, which activeTab
+     * covers on its own. An earlier version declared a content script, which made
+     * WXT infer <all_urls> — asking for permanent access to every site at install
+     * time for no functional gain. There is no content script now, so this should
+     * find nothing; it fails the build loudly if that ever changes by accident.
      */
     'build:manifestGenerated'(_wxt, manifest) {
-      delete manifest.host_permissions;
+      if (manifest.host_permissions?.length) {
+        throw new Error(
+          `Unexpected host_permissions: ${manifest.host_permissions.join(', ')}. ` +
+            'Capture uses activeTab; broad host access must be an explicit decision.',
+        );
+      }
     },
   },
 });

@@ -128,6 +128,33 @@ describe('page with no structured data', () => {
   });
 });
 
+describe('Czech shop conventions', () => {
+  let candidate: ReturnType<typeof extractCandidate>;
+
+  beforeAll(() => {
+    const doc = loadFixture('czech-shop.html', 'https://www.alza.cz/cat-holder-d7654321.htm');
+    candidate = extractCandidate(doc, 'https://www.alza.cz/cat-holder-d7654321.htm', 'CZK');
+  });
+
+  it('strips a suffix that names the domain rather than the shop label', () => {
+    // Site label is "Alza" but the title ends "| Alza.cz" — matching only the label
+    // left the suffix in place.
+    expect(candidate.title).toBe('AlzaErgo Cat Holder Šedý - Držák');
+  });
+
+  it('reads a price written with no currency mark at all', () => {
+    expect(candidate.price?.amount).toBe(999);
+  });
+
+  it('uses the configured default currency when the page shows none', () => {
+    expect(candidate.price?.currency).toBe('CZK');
+  });
+
+  it('does not mistake the VAT-excluded figure for the price', () => {
+    expect(candidate.price?.amount).not.toBe(826);
+  });
+});
+
 describe('resilience', () => {
   it('always returns something usable, even for an empty document', () => {
     const doc = new DOMParser().parseFromString('<html><head></head><body></body></html>', 'text/html');

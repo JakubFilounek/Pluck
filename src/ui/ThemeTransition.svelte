@@ -1,14 +1,16 @@
 <script lang="ts">
-  import CatArt from './CatArt.svelte';
-  import TechArt from './TechArt.svelte';
+  import CatScene from './CatScene.svelte';
+  import TechScene from './TechScene.svelte';
   import type { PersonId } from '../domain/types';
 
   /**
-   * Plays a full-screen wipe when the active person changes, carrying the incoming
-   * person's emblem — a glitching monitor for A, the two cats for B.
+   * Full-screen wipe played when the active person changes.
    *
-   * Purely cosmetic and pointer-events: none throughout, so it can never swallow a
-   * click even if a timer were somehow missed.
+   * The lifecycle is driven by the CSS animation's own `animationend` rather than by
+   * timers. An earlier version cleared its timers from the effect's cleanup, which
+   * Svelte also runs on an unrelated re-run — the veil then stayed up forever with
+   * the whole UI behind it. Ending on the animation itself cannot get stuck that way:
+   * if the animation runs at all, it finishes.
    */
 
   type Props = { person: PersonId };
@@ -16,51 +18,32 @@
   let { person }: Props = $props();
 
   let showing = $state(false);
-  let leaving = $state(false);
-
-  // Seeded once on purpose: `shown` is what the veil displays mid-animation, and
-  // `previous` is the change detector. Both are updated explicitly in the effect
-  // below rather than tracking the prop.
   /* svelte-ignore state_referenced_locally */
   let shown = $state<PersonId>(person);
   /* svelte-ignore state_referenced_locally */
   let previous: PersonId = person;
 
-  const IN_MS = 340;
-  const HOLD_MS = 260;
-  const OUT_MS = 420;
-
   $effect(() => {
-    // Reading `person` registers the dependency; bail on the initial run and on
-    // re-runs that didn't actually change who is active.
     if (person === previous) return;
     previous = person;
-
     shown = person;
-    showing = true;
-    leaving = false;
-
-    const toLeaving = setTimeout(() => (leaving = true), IN_MS + HOLD_MS);
-    const toDone = setTimeout(() => {
-      showing = false;
-      leaving = false;
-    }, IN_MS + HOLD_MS + OUT_MS);
-
-    return () => {
-      // A rapid double-switch restarts the animation instead of stacking timers.
-      clearTimeout(toLeaving);
-      clearTimeout(toDone);
-    };
+    // Restart cleanly if a second switch lands mid-wipe.
+    showing = false;
+    requestAnimationFrame(() => (showing = true));
   });
 </script>
 
 {#if showing}
-  <div class="switch-veil" class:leaving aria-hidden="true">
+  <div
+    class="switch-veil"
+    aria-hidden="true"
+    onanimationend={() => (showing = false)}
+  >
     <div class="emblem">
       {#if shown === 'a'}
-        <TechArt size={190} />
+        <TechScene width={340} />
       {:else}
-        <CatArt size={210} />
+        <CatScene width={340} />
       {/if}
     </div>
   </div>

@@ -20,9 +20,9 @@
   import SettingsDialog from '@/src/ui/SettingsDialog.svelte';
   import TagChip from '@/src/ui/TagChip.svelte';
   import WantStars from '@/src/ui/WantStars.svelte';
-  import CatArt from '@/src/ui/CatArt.svelte';
+  import CatScene from '@/src/ui/CatScene.svelte';
   import Icon from '@/src/ui/Icon.svelte';
-  import TechArt from '@/src/ui/TechArt.svelte';
+  import TechScene from '@/src/ui/TechScene.svelte';
   import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
   import ThemeTransition from '@/src/ui/ThemeTransition.svelte';
   import { applyAppearance } from '@/src/ui/theme';
@@ -464,9 +464,9 @@
           <div class="empty">
             <div class="empty-art">
               {#if settings.activePerson === 'a'}
-                <TechArt size={200} />
+                <TechScene width={340} />
               {:else}
-                <CatArt size={220} />
+                <CatScene width={360} />
               {/if}
             </div>
             {#if totalCount === 0}

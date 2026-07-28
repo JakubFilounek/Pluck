@@ -98,7 +98,8 @@ WXT + Svelte 5 + TypeScript, Manifest V3, data in IndexedDB via Dexie.
 | `entrypoints/popup/` | Capture with editable confirmation |
 | `entrypoints/dashboard/` | Full management UI — filters, views, editing, bulk actions |
 | `entrypoints/background.ts` | Context menus, keyboard shortcut, badge |
-| `entrypoints/content.ts` | Extraction, injected on demand only |
+| `src/capture.ts` | Pulls the page's markup back in one injected call |
+| `src/ui/catScene.ts` | The cats' idle behaviour, as testable pure logic |
 | `src/extract/` | JSON-LD → microdata → OpenGraph → Twitter → DOM heuristics |
 | `src/domain/` | Pure filter, sort and visibility logic |
 | `src/data/` | Dexie schema, queries, mutations, backup |
@@ -128,7 +129,11 @@ Two design rules worth knowing before changing anything:
 
 `storage`, `unlimitedStorage`, `contextMenus`, `activeTab`, `scripting` — and deliberately **no
 host permissions**. Pluck can only read a page at the moment you explicitly capture from it. A
-build hook in `wxt.config.ts` strips the `<all_urls>` that WXT would otherwise infer.
+build hook in `wxt.config.ts` fails the build if a host permission ever reappears.
+
+Capture is one `scripting.executeScript` call that returns the page's markup, which is then parsed
+here. There is no content script: the earlier messaging version could fail silently and fall back
+to just the tab title, with no price and no image.
 
 ## Limits worth knowing
 

@@ -42,6 +42,11 @@ describe('parseAmount', () => {
     expect(parseAmount('1.299,-')).toBe(1299);
   });
 
+  it('handles the bare Czech "999,-" form', () => {
+    expect(parseAmount('999,-')).toBe(999);
+    expect(parseAmount('12 990,-')).toBe(12990);
+  });
+
   it('returns undefined when there is no number', () => {
     expect(parseAmount('Sold out')).toBeUndefined();
     expect(parseAmount('')).toBeUndefined();

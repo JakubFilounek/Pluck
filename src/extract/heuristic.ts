@@ -24,14 +24,25 @@ const PRICE_HINT_SELECTORS = [
   '[class*="price" i]',
 ];
 
-/** Struck-through or original prices would otherwise win over the price actually charged. */
-const CROSSED_OUT_PATTERN = /(old|was|strike|through|original|regular|compare|list|before)/i;
+/**
+ * Prices that are on the page but are not the price you pay: struck-through "was"
+ * prices, and — the one that bites on Czech shops — the VAT-excluded figure printed
+ * under the real one ("999,- / bez DPH 826,-").
+ */
+const SECONDARY_PRICE_PATTERN =
+  /(old|was|strike|through|original|regular|compare|list|before|saving|discount|unit|puvodni|původní|bezdph|bez-dph|bez_dph|without.?vat|excl)/i;
 
-function isCrossedOut(element: Element): boolean {
+/** Text that marks the *containing* price as the secondary one. */
+const SECONDARY_TEXT_PATTERN = /(bez\s*dph|excl\.?\s*vat|without\s*vat|ušetříte|usetrite)/i;
+
+function isSecondaryPrice(element: Element): boolean {
   if (element.closest('del, s, strike')) return true;
 
   const signature = `${element.className} ${element.id}`;
-  return CROSSED_OUT_PATTERN.test(signature);
+  if (SECONDARY_PRICE_PATTERN.test(signature)) return true;
+
+  // "bez DPH 826,-" is often one text node with no distinguishing class at all.
+  return SECONDARY_TEXT_PATTERN.test(element.textContent ?? '');
 }
 
 function extractTitle(doc: Document): string | undefined {
@@ -56,7 +67,7 @@ function extractTitle(doc: Document): string | undefined {
 function extractPrice(doc: Document, fallbackCurrency: string) {
   for (const selector of PRICE_HINT_SELECTORS) {
     for (const element of doc.querySelectorAll(selector)) {
-      if (isCrossedOut(element)) continue;
+      if (isSecondaryPrice(element)) continue;
 
       const text = element.textContent?.replace(/\s+/g, ' ').trim();
       // Long strings are containers holding several prices, not a price itself.
@@ -68,9 +79,11 @@ function extractPrice(doc: Document, fallbackCurrency: string) {
   }
 
   // Nothing labelled a price — look for a currency-shaped string in the body text.
+  // Czech shops very often write "999,-" with no currency mark at all, so that shape
+  // is matched too and falls back to the configured default currency.
   const bodyText = doc.body?.textContent?.replace(/\s+/g, ' ') ?? '';
   const match =
-    /(?:[$€£₹¥]|Kč|CZK|EUR|USD|GBP|PLN|zł)\s?\d[\d\s.,]*|\d[\d\s.,]*\s?(?:Kč|CZK|EUR|USD|GBP|PLN|zł|€|\$|£)/.exec(
+    /(?:[$€£₹¥]|Kč|CZK|EUR|USD|GBP|PLN|zł)\s?\d[\d\s.,]*|\d[\d\s.,]*\s?(?:Kč|CZK|EUR|USD|GBP|PLN|zł|€|\$|£)|\d[\d\s ]*,-/.exec(
       bodyText,
     );
 
