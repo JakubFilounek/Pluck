@@ -1,121 +1,36 @@
 <script lang="ts">
-  import {
-    PERSON_IDS,
-    type Category,
-    type ListVisibility,
-    type PersonId,
-    type PluckList,
-    type Tag,
-  } from '../domain/types';
-  import {
-    createCategory,
-    createList,
-    createTag,
-    deleteCategory,
-    deleteList,
-    deleteTag,
-    updateList,
-  } from '../data/mutations';
-  import { missingDefaults, restoreDefaults } from '../data/db';
+  import { PERSON_IDS } from '../domain/types';
   import { downloadBackup, importBackup, type ImportResult } from '../data/backup';
   import { saveSettings, type Settings } from '../settings';
   import Icon from './Icon.svelte';
-  import { CATEGORY_ICONS } from './icons';
+
+  /**
+   * Preferences only.
+   *
+   * Lists, categories and tags used to live here, which meant leaving the thing you
+   * were looking at to change a label attached to it. They are managed in the
+   * dashboard sidebar now, next to the items they file.
+   */
 
   type Props = {
     settings: Settings;
-    categories: Category[];
-    tags: Tag[];
-    lists: PluckList[];
     onclose: () => void;
     onchange: () => void;
   };
 
-  let { settings, categories, tags, lists, onclose, onchange }: Props = $props();
+  let { settings, onclose, onchange }: Props = $props();
 
   // Edit buffer for the name fields. The dialog is mounted fresh each time it opens,
   // so seeding once is correct — and not tracking the prop stops a save round-trip
   // from clobbering what is being typed.
   /* svelte-ignore state_referenced_locally */
   let names = $state({ ...settings.personNames });
-  let newCategory = $state('');
-  let newCategoryIcon = $state<string>('box');
-  let newTag = $state('');
-  let newTagColor = $state('#b4531f');
-  let newList = $state('');
-  let newListIcon = $state<string>('heart');
-  let newListColor = $state('#db5f97');
-  let newListPrivate = $state(false);
-  let confirmingListDelete = $state<string | null>(null);
   let importMessage = $state('');
   let importError = $state('');
   let fileInput = $state<HTMLInputElement | null>(null);
 
-  // How many shipped defaults have been deleted, so the restore offer can name them.
-  let missingCategories = $state(0);
-  let missingTags = $state(0);
-
-  $effect(() => {
-    // Re-count whenever the lists change, so the offer disappears once restored.
-    void categories;
-    void tags;
-    void missingDefaults().then((missing) => {
-      missingCategories = missing.categories.length;
-      missingTags = missing.tags.length;
-    });
-  });
-
-  async function restore() {
-    await restoreDefaults();
-    onchange();
-  }
-
   async function patch(update: Partial<Settings>) {
     await saveSettings(update);
-    onchange();
-  }
-
-  async function addCategory() {
-    if (!newCategory.trim()) return;
-    await createCategory(newCategory.trim(), newCategoryIcon);
-    newCategory = '';
-    newCategoryIcon = 'box';
-    onchange();
-  }
-
-  async function addList() {
-    if (!newList.trim()) return;
-
-    await createList(
-      newList.trim(),
-      newListIcon,
-      newListColor,
-      newListPrivate ? 'private' : 'shared',
-      // A private list belongs to whoever is using the extension right now — they are
-      // the only person who will ever see it.
-      settings.activePerson,
-    );
-
-    newList = '';
-    newListPrivate = false;
-    onchange();
-  }
-
-  async function setListVisibility(listId: string, visibility: ListVisibility) {
-    await updateList(listId, { visibility });
-    onchange();
-  }
-
-  async function removeList(listId: string) {
-    await deleteList(listId);
-    confirmingListDelete = null;
-    onchange();
-  }
-
-  async function addTag() {
-    if (!newTag.trim()) return;
-    await createTag(newTag.trim(), newTagColor);
-    newTag = '';
     onchange();
   }
 
@@ -221,164 +136,6 @@
       </section>
 
       <section>
-        <h3>Seznamy</h3>
-        <ul class="rows">
-          {#each lists as entry (entry.id)}
-            <li class="list-item">
-              <Icon name={entry.icon} size={14} weight={1.9} />
-              <span class="truncate name">{entry.name}</span>
-
-              <select
-                class="vis"
-                value={entry.visibility}
-                onchange={(event) =>
-                  setListVisibility(entry.id, event.currentTarget.value as ListVisibility)}
-                aria-label="Viditelnost seznamu {entry.name}"
-              >
-                <option value="shared">sdílený</option>
-                <option value="private">soukromý</option>
-              </select>
-
-              {#if confirmingListDelete === entry.id}
-                <button class="btn btn-sm btn-danger" onclick={() => removeList(entry.id)}>
-                  Smazat
-                </button>
-                <button class="btn btn-sm" onclick={() => (confirmingListDelete = null)}>
-                  Zpět
-                </button>
-              {:else}
-                <button
-                  class="x"
-                  aria-label="Smazat seznam {entry.name}"
-                  onclick={() => (confirmingListDelete = entry.id)}
-                >
-                  <Icon name="close" size={10} weight={2.6} />
-                </button>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-
-        {#if confirmingListDelete}
-          <p class="hint">
-            Smazáním seznamu se položky nesmažou — jen z něj vypadnou. Pokud nezůstanou v žádném
-            jiném seznamu, uvidí je oba dva, i kdyby byl seznam soukromý.
-          </p>
-        {/if}
-
-        <div class="icon-picker" role="radiogroup" aria-label="Ikona nového seznamu">
-          {#each CATEGORY_ICONS as iconName (iconName)}
-            <button
-              type="button"
-              class="icon-option"
-              class:on={newListIcon === iconName}
-              role="radio"
-              aria-checked={newListIcon === iconName}
-              aria-label={iconName}
-              onclick={() => (newListIcon = iconName)}
-            >
-              <Icon name={iconName} size={16} />
-            </button>
-          {/each}
-        </div>
-
-        <div class="add">
-          <input class="color-input" type="color" bind:value={newListColor} aria-label="Barva" />
-          <input bind:value={newList} placeholder="Nový seznam" />
-          <button class="btn btn-sm" onclick={addList}>Přidat</button>
-        </div>
-
-        <label class="check">
-          <input type="checkbox" bind:checked={newListPrivate} />
-          Soukromý — uvidíš ho jen ty ({settings.personNames[settings.activePerson]})
-        </label>
-      </section>
-
-      <section>
-        <h3>Kategorie</h3>
-        <ul class="chips">
-          {#each categories as category (category.id)}
-            <li class="badge">
-              <Icon name={category.icon} size={13} weight={1.9} />
-              {category.name}
-              <button
-                class="x"
-                aria-label="Smazat kategorii {category.name}"
-                onclick={async () => {
-                  await deleteCategory(category.id);
-                  onchange();
-                }}
-              >
-                <Icon name="close" size={9} weight={2.6} />
-              </button>
-            </li>
-          {/each}
-        </ul>
-
-        <!-- Pick from the icon set rather than typing a character: every icon here
-             inherits the theme colour and looks the same on any machine. -->
-        <div class="icon-picker" role="radiogroup" aria-label="Ikona nové kategorie">
-          {#each CATEGORY_ICONS as iconName (iconName)}
-            <button
-              type="button"
-              class="icon-option"
-              class:on={newCategoryIcon === iconName}
-              role="radio"
-              aria-checked={newCategoryIcon === iconName}
-              aria-label={iconName}
-              onclick={() => (newCategoryIcon = iconName)}
-            >
-              <Icon name={iconName} size={16} />
-            </button>
-          {/each}
-        </div>
-        <div class="add">
-          <input bind:value={newCategory} placeholder="Nová kategorie" />
-          <button class="btn btn-sm" onclick={addCategory}>Přidat</button>
-        </div>
-        <p class="hint">Smazáním kategorie se položky nesmažou — jen přijdou o označení.</p>
-      </section>
-
-      <section>
-        <h3>Štítky</h3>
-        <ul class="chips">
-          {#each tags as tag (tag.id)}
-            <li class="badge" style="color: {tag.color}">
-              {tag.name}
-              <button
-                class="x"
-                aria-label="Smazat štítek {tag.name}"
-                onclick={async () => {
-                  await deleteTag(tag.id);
-                  onchange();
-                }}
-              >
-                <Icon name="close" size={9} weight={2.6} />
-              </button>
-            </li>
-          {/each}
-        </ul>
-        <div class="add">
-          <input class="color-input" type="color" bind:value={newTagColor} aria-label="Barva štítku" />
-          <input bind:value={newTag} placeholder="Nový štítek" />
-          <button class="btn btn-sm" onclick={addTag}>Přidat</button>
-        </div>
-      </section>
-
-      {#if missingCategories > 0 || missingTags > 0}
-        <section>
-          <h3>Obnovit výchozí</h3>
-          <p class="hint">
-            Chybí výchozí kategorie ({missingCategories}) a štítky ({missingTags}). Vrácením se nic
-            z toho, co jsi přidal(a), nezmění.
-          </p>
-          <div class="row">
-            <button class="btn btn-sm" onclick={restore}>Vrátit chybějící výchozí</button>
-          </div>
-        </section>
-      {/if}
-
-      <section>
         <h3>Záloha</h3>
         <p class="hint">
           Nic se nikam nesynchronizuje. Tenhle soubor je jediná kopie tvých seznamů mimo tenhle
@@ -396,11 +153,20 @@
           />
         </div>
         {#if settings.lastExportAt}
-          <p class="hint">Poslední záloha: {new Date(settings.lastExportAt).toLocaleDateString('cs-CZ')}</p>
+          <p class="hint">
+            Poslední záloha: {new Date(settings.lastExportAt).toLocaleDateString('cs-CZ')}
+          </p>
         {/if}
         {#if importMessage}<p class="ok">{importMessage}</p>{/if}
         {#if importError}<p class="err">{importError}</p>{/if}
         <p class="hint">Import slučuje — stávající položky se nikdy nepřepíšou ani nesmažou.</p>
+      </section>
+
+      <section>
+        <h3>Seznamy, kategorie, štítky</h3>
+        <p class="hint">
+          Spravují se v levém panelu přehledu — přidáš je tlačítkem + u nadpisu, smažeš křížkem.
+        </p>
       </section>
     </div>
   </div>
@@ -410,7 +176,7 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -420,7 +186,7 @@
   }
 
   .panel {
-    width: 520px;
+    width: 480px;
     max-width: 100%;
     /* An explicit height rather than max-height: the panel must be a bounded flex
        container before its scroll area has anything to scroll within. */
@@ -483,107 +249,6 @@
     color: var(--text);
     text-transform: none;
     margin: 0;
-  }
-
-  .check input {
-    width: 15px;
-    height: 15px;
-  }
-
-  .chips {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-
-  .x {
-    display: inline-flex;
-    border: none;
-    padding: 0 0 0 3px;
-    opacity: 0.6;
-    background: none;
-    line-height: 0;
-  }
-
-  .x:hover {
-    opacity: 1;
-    color: var(--danger);
-  }
-
-  .add {
-    display: flex;
-    gap: 6px;
-  }
-
-  .rows {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .list-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-  }
-
-  .list-item .name {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .vis {
-    width: auto;
-    font-size: 11px;
-    padding: 2px 4px;
-  }
-
-  .icon-picker {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
-  }
-
-  .icon-option {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm);
-    color: var(--text-dim);
-    border: 1px solid transparent;
-  }
-
-  .icon-option:hover {
-    color: var(--text);
-    background: var(--surface);
-  }
-
-  .icon-option.on {
-    color: var(--accent);
-    background: var(--accent-soft);
-    border-color: var(--accent);
-  }
-
-  .color-input {
-    width: 44px;
-    padding: 2px;
   }
 
   .hint {

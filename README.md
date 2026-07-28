@@ -108,6 +108,7 @@ WXT + Svelte 5 + TypeScript, Manifest V3, data in IndexedDB via Dexie.
 |---|---|
 | `entrypoints/popup/` | Capture with editable confirmation |
 | `entrypoints/dashboard/` | Full management UI — filters, views, editing, bulk actions |
+| `src/ui/InlineAdd.svelte` | The `+` that becomes a focused field in place |
 | `entrypoints/background.ts` | Context menus, keyboard shortcut, badge |
 | `src/capture.ts` | Pulls the page's markup back in one injected call |
 | `src/ui/catScene.ts` | The cats' idle behaviour, as testable pure logic |

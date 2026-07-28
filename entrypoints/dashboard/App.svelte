@@ -6,8 +6,17 @@
     bulkAddToList,
     bulkSetCategory,
     bulkSetStatus,
+    createCategory,
+    createList,
+    createTag,
+    deleteCategory,
+    deleteList,
+    deleteTag,
     setWant,
+    updateList,
   } from '@/src/data/mutations';
+  import { missingDefaults, restoreDefaults } from '@/src/data/db';
+  import InlineAdd from '@/src/ui/InlineAdd.svelte';
   import {
     listCategories,
     listLists,
@@ -61,6 +70,12 @@
   let openItemId = $state<string | null>(null);
   let showSettings = $state(false);
   let dismissedBackupNag = $state(false);
+  /** Id of the list/category/tag awaiting delete confirmation, if any. */
+  let confirmingDelete = $state<string | null>(null);
+  let missingDefaultCount = $state(0);
+
+  /** Colours cycled through for new tags and lists, so they aren't all identical. */
+  const SWATCHES = ['#c0392b', '#d35400', '#8e44ad', '#c2185b', '#2c7873', '#00838f'];
 
   let cleanupTheme = () => {};
   let cleanupSettings = () => {};
@@ -122,6 +137,9 @@
     // never hit something off-screen.
     const visible = new Set(items.map((item) => item.id));
     selected = new Set([...selected].filter((id) => visible.has(id)));
+
+    const missing = await missingDefaults();
+    missingDefaultCount = missing.categories.length + missing.tags.length;
 
     // Cosmetic badge refresh — never let a failed message break the render.
     browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
@@ -189,6 +207,52 @@
   async function bulk(action: () => Promise<void>) {
     await action();
     selected = new Set();
+    await refresh();
+  }
+
+  /* ---------------------------------------------- managing the sidebar itself */
+
+  async function addList(name: string) {
+    if (!settings) return;
+    // New lists start shared; making one private is a deliberate second step.
+    await createList(
+      name,
+      'heart',
+      SWATCHES[lists.length % SWATCHES.length]!,
+      'shared',
+      settings.activePerson,
+    );
+    await refresh();
+  }
+
+  async function toggleListPrivacy(list: PluckList) {
+    await updateList(list.id, {
+      visibility: list.visibility === 'private' ? 'shared' : 'private',
+    });
+    await refresh();
+  }
+
+  async function addCategory(name: string) {
+    await createCategory(name, 'box');
+    await refresh();
+  }
+
+  async function addTag(name: string) {
+    await createTag(name, SWATCHES[tags.length % SWATCHES.length]!);
+    await refresh();
+  }
+
+  async function removeThing(kind: 'list' | 'category' | 'tag', id: string) {
+    if (kind === 'list') await deleteList(id);
+    else if (kind === 'category') await deleteCategory(id);
+    else await deleteTag(id);
+
+    confirmingDelete = null;
+    await refresh();
+  }
+
+  async function restore() {
+    await restoreDefaults();
     await refresh();
   }
 
@@ -300,11 +364,15 @@
 
     <div class="body">
       <aside class="sidebar">
-        {#if lists.length > 0}
-          <section>
-            <h3>Seznamy</h3>
-            {#each lists as entry (entry.id)}
-              <label class="check">
+        <section>
+          <h3>
+            Seznamy
+            <InlineAdd placeholder="Název seznamu" label="Přidat seznam" onadd={addList} />
+          </h3>
+
+          {#each lists as entry (entry.id)}
+            <div class="manage-row">
+              <label class="check grow">
                 <input
                   type="checkbox"
                   checked={filters.listIds.includes(entry.id)}
@@ -312,16 +380,44 @@
                 />
                 <Icon name={entry.icon} size={13} weight={1.9} />
                 <span class="truncate">{entry.name}</span>
-                {#if entry.visibility === 'private'}
-                  <span class="lock" title="Soukromý seznam — vidíš ho jen ty">
-                    <Icon name="tool" size={10} weight={2} />
-                  </span>
-                {/if}
                 <span class="muted count-badge">{listCounts.get(entry.id) ?? 0}</span>
               </label>
-            {/each}
-          </section>
-        {/if}
+
+              {#if confirmingDelete === entry.id}
+                <button class="mini danger" onclick={() => removeThing('list', entry.id)}>
+                  Smazat
+                </button>
+                <button class="mini" onclick={() => (confirmingDelete = null)}>Zpět</button>
+              {:else}
+                <button
+                  class="mini icon-only"
+                  class:on={entry.visibility === 'private'}
+                  title={entry.visibility === 'private'
+                    ? 'Soukromý — vidíš ho jen ty. Kliknutím zveřejníš.'
+                    : 'Sdílený. Kliknutím uděláš soukromý.'}
+                  aria-label="Přepnout soukromí seznamu {entry.name}"
+                  onclick={() => toggleListPrivacy(entry)}
+                >
+                  <Icon name={entry.visibility === 'private' ? 'heart' : 'star-empty'} size={11} />
+                </button>
+                <button
+                  class="mini icon-only"
+                  aria-label="Smazat seznam {entry.name}"
+                  onclick={() => (confirmingDelete = entry.id)}
+                >
+                  <Icon name="close" size={10} weight={2.4} />
+                </button>
+              {/if}
+            </div>
+          {/each}
+
+          {#if confirmingDelete && lists.some((entry) => entry.id === confirmingDelete)}
+            <p class="warn">
+              Položky se nesmažou — jen ze seznamu vypadnou. Pokud nejsou v žádném jiném, uvidíte
+              je oba, i když byl soukromý.
+            </p>
+          {/if}
+        </section>
 
         <section>
           <h3>Stav</h3>
@@ -338,17 +434,35 @@
         </section>
 
         <section>
-          <h3>Kategorie</h3>
+          <h3>
+            Kategorie
+            <InlineAdd placeholder="Název kategorie" label="Přidat kategorii" onadd={addCategory} />
+          </h3>
           <div class="chips">
             {#each categories as category (category.id)}
-              <button
-                class="pill"
-                class:on={filters.categoryIds.includes(category.id)}
-                onclick={() => toggleCategory(category.id)}
-              >
-                <Icon name={category.icon} size={12} weight={1.9} />
-                {category.name}
-              </button>
+              <span class="pill-wrap">
+                <button
+                  class="pill"
+                  class:on={filters.categoryIds.includes(category.id)}
+                  onclick={() => toggleCategory(category.id)}
+                >
+                  <Icon name={category.icon} size={12} weight={1.9} />
+                  {category.name}
+                </button>
+                {#if confirmingDelete === category.id}
+                  <button class="mini danger" onclick={() => removeThing('category', category.id)}>
+                    Smazat?
+                  </button>
+                {:else}
+                  <button
+                    class="pill-x"
+                    aria-label="Smazat kategorii {category.name}"
+                    onclick={() => (confirmingDelete = category.id)}
+                  >
+                    <Icon name="close" size={9} weight={2.6} />
+                  </button>
+                {/if}
+              </span>
             {/each}
           </div>
         </section>
@@ -356,24 +470,48 @@
         <section>
           <h3>
             Štítky
-            <button
-              class="mode"
-              onclick={() => {
-                filters.tagMode = filters.tagMode === 'any' ? 'all' : 'any';
-                refresh();
-              }}>{filters.tagMode === 'any' ? 'kterýkoli' : 'všechny'}</button
-            >
+            <span class="row">
+              <button
+                class="mode"
+                onclick={() => {
+                  filters.tagMode = filters.tagMode === 'any' ? 'all' : 'any';
+                  refresh();
+                }}>{filters.tagMode === 'any' ? 'kterýkoli' : 'všechny'}</button
+              >
+              <InlineAdd placeholder="Název štítku" label="Přidat štítek" onadd={addTag} />
+            </span>
           </h3>
           <div class="chips">
             {#each tags as tag (tag.id)}
-              <TagChip
-                {tag}
-                selected={filters.tagIds.includes(tag.id)}
-                count={usage.get(tag.id) ?? 0}
-                onclick={() => toggleTagFilter(tag.id)}
-              />
+              <span class="pill-wrap">
+                <TagChip
+                  {tag}
+                  selected={filters.tagIds.includes(tag.id)}
+                  count={usage.get(tag.id) ?? 0}
+                  onclick={() => toggleTagFilter(tag.id)}
+                />
+                {#if confirmingDelete === tag.id}
+                  <button class="mini danger" onclick={() => removeThing('tag', tag.id)}>
+                    Smazat?
+                  </button>
+                {:else}
+                  <button
+                    class="pill-x"
+                    aria-label="Smazat štítek {tag.name}"
+                    onclick={() => (confirmingDelete = tag.id)}
+                  >
+                    <Icon name="close" size={9} weight={2.6} />
+                  </button>
+                {/if}
+              </span>
             {/each}
           </div>
+
+          {#if missingDefaultCount > 0}
+            <button class="btn btn-ghost btn-sm restore" onclick={restore}>
+              Vrátit výchozí ({missingDefaultCount})
+            </button>
+          {/if}
         </section>
 
         <section>
@@ -637,9 +775,6 @@
   {#if showSettings}
     <SettingsDialog
       {settings}
-      {categories}
-      {tags}
-      {lists}
       onclose={() => (showSettings = false)}
       onchange={async () => {
         settings = await loadSettings();
@@ -769,16 +904,110 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px;
+    min-height: 20px;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-dim);
   }
 
-  .lock {
+  /* A managed row: the filter checkbox takes the space, controls sit at the end and
+     only appear on hover or focus so the sidebar stays calm while browsing. */
+  .manage-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .manage-row .grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mini {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 5px;
+    font-size: 10.5px;
+    border-radius: 4px;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+    opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
+  }
+
+  .mini.icon-only {
+    padding: 3px;
+  }
+
+  .manage-row:hover .mini,
+  .manage-row:focus-within .mini,
+  .mini:focus-visible,
+  .mini.danger,
+  .mini.on {
+    opacity: 1;
+  }
+
+  .mini:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .mini.on {
     color: var(--gift);
-    flex-shrink: 0;
+  }
+
+  .mini.danger {
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  }
+
+  .pill-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pill-x {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+
+  .pill-wrap:hover .pill-x,
+  .pill-x:focus-visible {
+    opacity: 1;
+  }
+
+  .pill-x:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  .warn {
+    margin: 2px 0 0;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--text-dim);
+  }
+
+  .restore {
+    align-self: flex-start;
+    margin-top: 4px;
   }
 
   .count-badge {

@@ -75,6 +75,50 @@ textarea {
   min-height: 60px;
 }
 
+/* Checkboxes, drawn rather than native.
+   The platform control ignores the theme entirely — a blue Windows tick inside the
+   pink palette, and an unreadably dark box on the dark backgrounds. */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+input[type='checkbox']::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  transform: scale(0);
+  transition: transform 0.12s cubic-bezier(0.3, 1.4, 0.5, 1);
+  background: var(--on-accent);
+  /* A tick, as a clip-path — no font or image dependency. */
+  clip-path: polygon(14% 46%, 0 60%, 39% 100%, 100% 22%, 86% 8%, 39% 72%);
+}
+
+input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type='checkbox']:checked::before {
+  transform: scale(1);
+}
+
+input[type='checkbox']:hover:not(:checked) {
+  border-color: var(--accent);
+}
+
 label,
 /* For captions over a group of controls (tags, star ratings), where there is no
    single input to associate a real <label> with. */
