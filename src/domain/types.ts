@@ -52,6 +52,11 @@ export type Item = {
   categoryId?: string;
   tagIds: string[];
   /**
+   * Lists this item belongs to. An item in no list at all is "unfiled" and visible to
+   * everyone; an item in lists is visible to whoever can see at least one of them.
+   */
+  listIds: string[];
+  /**
    * Independent want-rating per person. This is the heart of the model: "how much I
    * want it" and "how much she wants it" are separate numbers, never averaged away.
    */
@@ -70,6 +75,28 @@ export type Item = {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+/**
+ * A named list. Items can belong to any number of them.
+ *
+ * 'private' means visible only to its owner — that is what keeps a surprise off the
+ * other person's screen. 'shared' means both people see it. There is deliberately no
+ * middle ground: two users, so anything not private is shared.
+ */
+export type ListVisibility = 'shared' | 'private';
+
+export type PluckList = {
+  id: string;
+  name: string;
+  /** Icon name from src/ui/icons.ts. */
+  icon: string;
+  color: string;
+  visibility: ListVisibility;
+  /** Who created it. Only meaningful for private lists, which only they can see. */
+  ownerId: PersonId;
+  sortOrder: number;
+  createdAt: string;
 };
 
 export type Category = {

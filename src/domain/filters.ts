@@ -1,4 +1,4 @@
-import type { Item, ItemStatus, PersonId } from './types';
+import type { Item, ItemStatus, PersonId, PluckList } from './types';
 
 /**
  * Pure filtering logic. Kept free of Dexie and browser APIs so the rules — especially
@@ -15,6 +15,8 @@ export type ItemFilters = {
   categoryIds: string[];
   tagIds: string[];
   tagMode: TagMode;
+  /** Empty means every list the viewer can see. */
+  listIds: string[];
   /** Restrict to items added by a specific person. */
   addedBy?: PersonId;
   /** Whose want-rating minWant applies to. 'either' passes if any person clears it. */
@@ -33,6 +35,7 @@ export const DEFAULT_FILTERS: ItemFilters = {
   categoryIds: [],
   tagIds: [],
   tagMode: 'any',
+  listIds: [],
   wantOf: 'either',
   minWant: 0,
   sites: [],
@@ -43,6 +46,7 @@ export function isDefaultFilters(filters: ItemFilters): boolean {
     filters.search === '' &&
     filters.categoryIds.length === 0 &&
     filters.tagIds.length === 0 &&
+    filters.listIds.length === 0 &&
     filters.addedBy === undefined &&
     filters.minWant === 0 &&
     filters.priceMin === undefined &&
@@ -51,21 +55,48 @@ export function isDefaultFilters(filters: ItemFilters): boolean {
   );
 }
 
+/** Lookup of list id to list, as the visibility rules need it. */
+export type ListIndex = Map<string, PluckList>;
+
+export function indexLists(lists: PluckList[]): ListIndex {
+  return new Map(lists.map((list) => [list.id, list]));
+}
+
+/** A private list is visible only to the person who created it. */
+export function canSeeList(list: PluckList | undefined, viewer: PersonId): boolean {
+  if (!list) return false;
+  return list.visibility === 'shared' || list.ownerId === viewer;
+}
+
 /**
- * Surprise mode. An item flagged as a gift for someone is hidden from that person
- * while they are the active person, so two people sharing one browser profile can
- * keep Christmas lists on it without spoiling each other.
+ * Whether an item is hidden from the person currently using the extension.
  *
- * This is a courtesy screen, not security — the person toggle is one click away.
- * That caveat is surfaced in the settings UI rather than pretended away here.
+ * Two independent rules, and an item is hidden if either applies:
+ *
+ * 1. Surprise mode — an item flagged as a gift for the viewer is hidden from them,
+ *    so two people sharing one browser profile don't spoil each other.
+ * 2. List privacy — an item filed only into private lists belonging to someone else
+ *    is hidden. An item in no list at all is unfiled and visible to both.
+ *
+ * Neither is security: the person toggle is one click away and the backup contains
+ * everything. They stop accidental spoilers, not deliberate snooping, and the
+ * settings UI says so rather than implying otherwise.
  */
 export function isHiddenFromViewer(
   item: Item,
   viewer: PersonId,
   surpriseMode: boolean,
+  lists: ListIndex = new Map(),
 ): boolean {
-  if (!surpriseMode) return false;
-  return item.giftFor === viewer;
+  if (surpriseMode && item.giftFor === viewer) return true;
+
+  const listIds = item.listIds ?? [];
+  if (listIds.length === 0) return false;
+
+  // Visible as soon as one of its lists is visible. An item filed into both a shared
+  // and a private list is still shared — filing it somewhere private does not
+  // retract it from the list you both already see.
+  return !listIds.some((id) => canSeeList(lists.get(id), viewer));
 }
 
 /** Highest want rating on the item across both people. */
@@ -126,8 +157,14 @@ function matchesPrice(item: Item, min?: number, max?: number): boolean {
   return true;
 }
 
+function matchesLists(item: Item, listIds: string[]): boolean {
+  if (listIds.length === 0) return true;
+  return listIds.some((id) => (item.listIds ?? []).includes(id));
+}
+
 export function matchesFilters(item: Item, filters: ItemFilters): boolean {
   if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) return false;
+  if (!matchesLists(item, filters.listIds)) return false;
   if (filters.categoryIds.length > 0) {
     if (!item.categoryId || !filters.categoryIds.includes(item.categoryId)) return false;
   }
@@ -146,8 +183,10 @@ export function filterItems(
   filters: ItemFilters,
   viewer: PersonId,
   surpriseMode: boolean,
+  lists: ListIndex = new Map(),
 ): Item[] {
   return items.filter(
-    (item) => !isHiddenFromViewer(item, viewer, surpriseMode) && matchesFilters(item, filters),
+    (item) =>
+      !isHiddenFromViewer(item, viewer, surpriseMode, lists) && matchesFilters(item, filters),
   );
 }

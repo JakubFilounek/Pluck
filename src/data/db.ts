@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Category, Item, Tag } from '../domain/types';
+import type { Category, Item, PluckList, Tag } from '../domain/types';
 
 /**
  * IndexedDB via Dexie, not a single storage.local JSON blob. Two reasons:
@@ -15,6 +15,7 @@ export type Thumbnail = {
 
 export type PluckDatabase = Dexie & {
   items: EntityTable<Item, 'id'>;
+  lists: EntityTable<PluckList, 'id'>;
   categories: EntityTable<Category, 'id'>;
   tags: EntityTable<Tag, 'id'>;
   thumbnails: EntityTable<Thumbnail, 'id'>;
@@ -31,47 +32,81 @@ db.version(1).stores({
   thumbnails: 'id',
 });
 
+// v2 introduces named lists. Existing items get an empty listIds so they stay
+// "unfiled" and visible to everyone rather than disappearing behind a list they
+// were never in.
+db.version(2)
+  .stores({
+    items:
+      'id, canonicalUrl, status, categoryId, *tagIds, *listIds, site, giftFor, addedBy, createdAt, updatedAt',
+    lists: 'id, name, visibility, ownerId, sortOrder',
+    categories: 'id, name, sortOrder',
+    tags: 'id, name, sortOrder',
+    thumbnails: 'id',
+  })
+  .upgrade(async (transaction) => {
+    await transaction
+      .table('items')
+      .toCollection()
+      .modify((item: Item) => {
+        item.listIds ??= [];
+      });
+  });
+
+export const DEFAULT_LIST_ID = 'list-nas-seznam';
+
+/** The one list that exists out of the box, so nothing starts unfiled. */
+export const DEFAULT_LISTS: PluckList[] = [
+  {
+    id: DEFAULT_LIST_ID,
+    name: 'Náš seznam',
+    icon: 'heart',
+    color: '#db5f97',
+    visibility: 'shared',
+    ownerId: 'a',
+    sortOrder: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+];
+
 // `icon` holds a name from src/ui/icons.ts, not a glyph — see the note on the
 // Category type. Unknown names resolve to the box icon rather than rendering blank.
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat-electronics', name: 'Electronics', icon: 'laptop', sortOrder: 0 },
-  { id: 'cat-home', name: 'Home', icon: 'home', sortOrder: 1 },
-  { id: 'cat-kitchen', name: 'Kitchen', icon: 'kitchen', sortOrder: 2 },
-  { id: 'cat-clothing', name: 'Clothing', icon: 'clothing', sortOrder: 3 },
-  { id: 'cat-beauty', name: 'Beauty', icon: 'beauty', sortOrder: 4 },
-  { id: 'cat-books', name: 'Books & Media', icon: 'book', sortOrder: 5 },
-  { id: 'cat-hobby', name: 'Hobby & Sport', icon: 'hobby', sortOrder: 6 },
-  { id: 'cat-garden', name: 'Garden', icon: 'garden', sortOrder: 7 },
-  { id: 'cat-other', name: 'Other', icon: 'box', sortOrder: 8 },
+  { id: 'cat-electronics', name: 'Elektronika', icon: 'laptop', sortOrder: 0 },
+  { id: 'cat-home', name: 'Domácnost', icon: 'home', sortOrder: 1 },
+  { id: 'cat-kitchen', name: 'Kuchyně', icon: 'kitchen', sortOrder: 2 },
+  { id: 'cat-clothing', name: 'Oblečení', icon: 'clothing', sortOrder: 3 },
+  { id: 'cat-beauty', name: 'Kosmetika', icon: 'beauty', sortOrder: 4 },
+  { id: 'cat-books', name: 'Knihy a média', icon: 'book', sortOrder: 5 },
+  { id: 'cat-hobby', name: 'Koníčky a sport', icon: 'hobby', sortOrder: 6 },
+  { id: 'cat-garden', name: 'Zahrada', icon: 'garden', sortOrder: 7 },
+  { id: 'cat-other', name: 'Ostatní', icon: 'box', sortOrder: 8 },
 ];
 
 export const DEFAULT_TAGS: Tag[] = [
-  { id: 'tag-christmas', name: 'Christmas', color: '#c0392b', sortOrder: 0 },
-  { id: 'tag-birthday', name: 'Birthday', color: '#d35400', sortOrder: 1 },
-  { id: 'tag-nameday', name: 'Nameday', color: '#8e44ad', sortOrder: 2 },
-  { id: 'tag-anniversary', name: 'Anniversary', color: '#c2185b', sortOrder: 3 },
-  { id: 'tag-someday', name: 'Someday', color: '#2c7873', sortOrder: 4 },
-  { id: 'tag-onsale', name: 'On sale', color: '#00838f', sortOrder: 5 },
+  { id: 'tag-christmas', name: 'Vánoce', color: '#c0392b', sortOrder: 0 },
+  { id: 'tag-birthday', name: 'Narozeniny', color: '#d35400', sortOrder: 1 },
+  { id: 'tag-nameday', name: 'Jmeniny', color: '#8e44ad', sortOrder: 2 },
+  { id: 'tag-anniversary', name: 'Výročí', color: '#c2185b', sortOrder: 3 },
+  { id: 'tag-someday', name: 'Někdy později', color: '#2c7873', sortOrder: 4 },
+  { id: 'tag-onsale', name: 'Ve slevě', color: '#00838f', sortOrder: 5 },
 ];
 
 /**
- * Seeds the starter categories and tags exactly once. Uses add() per row and swallows
- * constraint errors so a second call can never duplicate or overwrite rows the user
- * has since renamed or deleted.
+ * Seeds the starter lists, categories and tags exactly once. Each table is filled
+ * only when empty, so this can never duplicate or overwrite rows you have since
+ * renamed or deleted.
  */
 export async function seedDefaults(): Promise<void> {
-  const [categoryCount, tagCount] = await Promise.all([
+  const [listCount, categoryCount, tagCount] = await Promise.all([
+    db.lists.count(),
     db.categories.count(),
     db.tags.count(),
   ]);
 
-  if (categoryCount === 0) {
-    await db.categories.bulkAdd(DEFAULT_CATEGORIES);
-  }
-
-  if (tagCount === 0) {
-    await db.tags.bulkAdd(DEFAULT_TAGS);
-  }
+  if (listCount === 0) await db.lists.bulkAdd(DEFAULT_LISTS);
+  if (categoryCount === 0) await db.categories.bulkAdd(DEFAULT_CATEGORIES);
+  if (tagCount === 0) await db.tags.bulkAdd(DEFAULT_TAGS);
 }
 
 /**

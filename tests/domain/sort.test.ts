@@ -10,6 +10,7 @@ function makeItem(id: string, overrides: Partial<Item> = {}): Item {
     canonicalUrl: `https://shop.com/${id}`,
     site: 'Shop',
     tagIds: [],
+    listIds: [],
     want: {},
     status: 'wanted',
     addedBy: 'a',

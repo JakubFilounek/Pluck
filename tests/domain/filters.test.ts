@@ -17,6 +17,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     canonicalUrl: 'https://shop.com/throw',
     site: 'Shop',
     tagIds: [],
+    listIds: [],
     want: {},
     status: 'wanted',
     addedBy: 'a',

@@ -1,7 +1,7 @@
 import { db } from './db';
 import { exportAllItems } from './queries';
 import { loadSettings, saveSettings, type Settings } from '../settings';
-import type { Category, Item, Tag } from '../domain/types';
+import type { Category, Item, PluckList, Tag } from '../domain/types';
 
 /**
  * JSON backup.
@@ -12,21 +12,24 @@ import type { Category, Item, Tag } from '../domain/types';
  * The UI says so plainly next to the button.
  */
 
-export const BACKUP_VERSION = 1;
+// 2 adds `lists`. A v1 file still imports — its items simply arrive unfiled.
+export const BACKUP_VERSION = 2;
 
 export type BackupFile = {
   format: 'pluck-backup';
   version: number;
   exportedAt: string;
   items: Item[];
+  lists?: PluckList[];
   categories: Category[];
   tags: Tag[];
   settings: Pick<Settings, 'personNames' | 'defaultCurrency'>;
 };
 
 export async function buildBackup(): Promise<BackupFile> {
-  const [items, categories, tags, settings] = await Promise.all([
+  const [items, lists, categories, tags, settings] = await Promise.all([
     exportAllItems(),
+    db.lists.toArray(),
     db.categories.toArray(),
     db.tags.toArray(),
     loadSettings(),
@@ -37,6 +40,7 @@ export async function buildBackup(): Promise<BackupFile> {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     items,
+    lists,
     categories,
     tags,
     settings: {
@@ -64,6 +68,7 @@ export async function downloadBackup(): Promise<void> {
 export type ImportResult = {
   itemsAdded: number;
   itemsSkipped: number;
+  listsAdded: number;
   categoriesAdded: number;
   tagsAdded: number;
 };
@@ -103,11 +108,18 @@ export async function importBackup(json: string): Promise<ImportResult> {
   const result: ImportResult = {
     itemsAdded: 0,
     itemsSkipped: 0,
+    listsAdded: 0,
     categoriesAdded: 0,
     tagsAdded: 0,
   };
 
-  await db.transaction('rw', db.items, db.categories, db.tags, async () => {
+  await db.transaction('rw', db.items, db.lists, db.categories, db.tags, async () => {
+    for (const list of parsed.lists ?? []) {
+      if (await db.lists.get(list.id)) continue;
+      await db.lists.add(list);
+      result.listsAdded += 1;
+    }
+
     for (const category of parsed.categories ?? []) {
       if (await db.categories.get(category.id)) continue;
       await db.categories.add(category);
@@ -126,9 +138,14 @@ export async function importBackup(json: string): Promise<ImportResult> {
         continue;
       }
 
-      // Guard against a hand-edited file: a missing tagIds array would break every
-      // filter that reads it.
-      await db.items.add({ ...item, tagIds: item.tagIds ?? [], want: item.want ?? {} });
+      // Guard against a hand-edited file, and against v1 exports which predate
+      // lists: a missing array would break every filter that reads it.
+      await db.items.add({
+        ...item,
+        tagIds: item.tagIds ?? [],
+        listIds: item.listIds ?? [],
+        want: item.want ?? {},
+      });
       result.itemsAdded += 1;
     }
   });

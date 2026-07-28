@@ -3,14 +3,32 @@
   import { seedDefaults } from '@/src/data/db';
   import {
     bulkAddTag,
+    bulkAddToList,
     bulkSetCategory,
     bulkSetStatus,
     setWant,
   } from '@/src/data/mutations';
-  import { listCategories, listSites, listTags, queryItems, tagUsage } from '@/src/data/queries';
+  import {
+    listCategories,
+    listLists,
+    listSites,
+    listTags,
+    listUsage,
+    queryItems,
+    tagUsage,
+  } from '@/src/data/queries';
   import { DEFAULT_FILTERS, type ItemFilters } from '@/src/domain/filters';
   import { SORT_LABELS, type SortMode } from '@/src/domain/sort';
-  import { ITEM_STATUSES, type Category, type Item, type ItemStatus, type PersonId, type Tag, type WantLevel } from '@/src/domain/types';
+  import {
+    ITEM_STATUSES,
+    type Category,
+    type Item,
+    type ItemStatus,
+    type PersonId,
+    type PluckList,
+    type Tag,
+    type WantLevel,
+  } from '@/src/domain/types';
   import { formatPrice } from '@/src/extract/price';
   import { loadSettings, otherPerson, saveSettings, watchSettings, type Settings } from '@/src/settings';
   import ItemCard from '@/src/ui/ItemCard.svelte';
@@ -33,6 +51,8 @@
   let tags = $state<Tag[]>([]);
   let sites = $state<string[]>([]);
   let usage = $state<Map<string, number>>(new Map());
+  let lists = $state<PluckList[]>([]);
+  let listCounts = $state<Map<string, number>>(new Map());
   let totalCount = $state(0);
 
   let filters = $state<ItemFilters>({ ...DEFAULT_FILTERS });
@@ -77,13 +97,22 @@
 
     const ctx = { viewer: settings.activePerson, surpriseMode: settings.surpriseMode };
 
-    [items, categories, tags, sites, usage] = await Promise.all([
+    [items, categories, tags, sites, usage, lists, listCounts] = await Promise.all([
       queryItems(ctx, filters, sort),
       listCategories(),
       listTags(),
       listSites(ctx),
       tagUsage(ctx),
+      listLists(settings.activePerson),
+      listUsage(ctx),
     ]);
+
+    // Drop any list filter pointing at a list this person can no longer see — for
+    // instance after switching person with a private list selected.
+    const visibleListIds = new Set(lists.map((entry) => entry.id));
+    if (filters.listIds.some((id) => !visibleListIds.has(id))) {
+      filters.listIds = filters.listIds.filter((id) => visibleListIds.has(id));
+    }
 
     // Count everything visible, ignoring filters, so the backup nag and the empty
     // state can tell "no items yet" apart from "nothing matches this filter".
@@ -113,6 +142,13 @@
     filters.statuses = filters.statuses.includes(status)
       ? filters.statuses.filter((value) => value !== status)
       : [...filters.statuses, status];
+    void refresh();
+  }
+
+  function toggleList(id: string) {
+    filters.listIds = filters.listIds.includes(id)
+      ? filters.listIds.filter((value) => value !== id)
+      : [...filters.listIds, id];
     void refresh();
   }
 
@@ -161,6 +197,7 @@
   const activeFilterCount = $derived(
     filters.categoryIds.length +
       filters.tagIds.length +
+      filters.listIds.length +
       filters.sites.length +
       (filters.search ? 1 : 0) +
       (filters.minWant > 0 ? 1 : 0) +
@@ -189,16 +226,16 @@
               class="whiskers"><Icon name="paw" size={12} /></i
             >{/if}
         </span>
-        <span class="muted count">{items.length} shown</span>
+        <span class="muted count">zobrazeno {items.length}</span>
       </div>
 
       <input
         class="search"
         type="search"
-        placeholder="Search title, brand, shop, notes…"
+        placeholder="Hledat v názvu, značce, obchodu, poznámkách…"
         bind:value={filters.search}
         oninput={refresh}
-        aria-label="Search items"
+        aria-label="Hledat položky"
       />
 
       <div class="row">
@@ -207,12 +244,12 @@
           names={settings.personNames}
           onchange={switchPerson}
         />
-        <div class="seg" role="group" aria-label="View mode">
+        <div class="seg" role="group" aria-label="Zobrazení">
           <button
             class="seg-btn"
             class:on={settings.viewMode === 'grid'}
             aria-pressed={settings.viewMode === 'grid'}
-            aria-label="Thumbnail view"
+            aria-label="Dlaždice"
             onclick={() => setViewMode('grid')}
           >
             <Icon name="grid" size={15} />
@@ -221,13 +258,13 @@
             class="seg-btn"
             class:on={settings.viewMode === 'list'}
             aria-pressed={settings.viewMode === 'list'}
-            aria-label="List view"
+            aria-label="Seznam"
             onclick={() => setViewMode('list')}
           >
             <Icon name="list" size={15} />
           </button>
         </div>
-        <select bind:value={sort} onchange={refresh} aria-label="Sort by" class="sort">
+        <select bind:value={sort} onchange={refresh} aria-label="Řadit podle" class="sort">
           {#each Object.entries(SORT_LABELS) as [value, label] (value)}
             <option {value}>{label}</option>
           {/each}
@@ -235,7 +272,7 @@
         <button
           class="btn btn-ghost btn-sm"
           onclick={() => (showSettings = true)}
-          aria-label="Settings"
+          aria-label="Nastavení"
         >
           <Icon name="settings" size={16} />
         </button>
@@ -245,17 +282,17 @@
     {#if showBackupNag}
       <div class="nag">
         <span>
-          Nothing here is synced. Your last backup was
+          Nic se nikam nezálohuje samo.
           {settings.lastExportAt
-            ? `on ${new Date(settings.lastExportAt).toLocaleDateString()}`
-            : 'never taken'}.
+            ? `Poslední záloha: ${new Date(settings.lastExportAt).toLocaleDateString('cs-CZ')}.`
+            : 'Zatím jsi žádnou zálohu neudělal(a).'}
         </span>
         <div class="row">
           <button class="btn btn-sm" onclick={async () => { await downloadBackup(); settings = await loadSettings(); }}>
-            Export now
+            Zálohovat teď
           </button>
           <button class="btn btn-ghost btn-sm" onclick={() => (dismissedBackupNag = true)}>
-            Later
+            Později
           </button>
         </div>
       </div>
@@ -263,8 +300,31 @@
 
     <div class="body">
       <aside class="sidebar">
+        {#if lists.length > 0}
+          <section>
+            <h3>Seznamy</h3>
+            {#each lists as entry (entry.id)}
+              <label class="check">
+                <input
+                  type="checkbox"
+                  checked={filters.listIds.includes(entry.id)}
+                  onchange={() => toggleList(entry.id)}
+                />
+                <Icon name={entry.icon} size={13} weight={1.9} />
+                <span class="truncate">{entry.name}</span>
+                {#if entry.visibility === 'private'}
+                  <span class="lock" title="Soukromý seznam — vidíš ho jen ty">
+                    <Icon name="tool" size={10} weight={2} />
+                  </span>
+                {/if}
+                <span class="muted count-badge">{listCounts.get(entry.id) ?? 0}</span>
+              </label>
+            {/each}
+          </section>
+        {/if}
+
         <section>
-          <h3>Status</h3>
+          <h3>Stav</h3>
           {#each ITEM_STATUSES as status (status)}
             <label class="check">
               <input
@@ -272,13 +332,13 @@
                 checked={filters.statuses.includes(status)}
                 onchange={() => toggleStatus(status)}
               />
-              {status === 'wanted' ? 'Wanted' : status === 'bought' ? 'Bought' : 'Not wanted'}
+              {status === 'wanted' ? 'Chceme' : status === 'bought' ? 'Koupeno' : 'Už nechceme'}
             </label>
           {/each}
         </section>
 
         <section>
-          <h3>Categories</h3>
+          <h3>Kategorie</h3>
           <div class="chips">
             {#each categories as category (category.id)}
               <button
@@ -295,13 +355,13 @@
 
         <section>
           <h3>
-            Tags
+            Štítky
             <button
               class="mode"
               onclick={() => {
                 filters.tagMode = filters.tagMode === 'any' ? 'all' : 'any';
                 refresh();
-              }}>{filters.tagMode === 'any' ? 'any of' : 'all of'}</button
+              }}>{filters.tagMode === 'any' ? 'kterýkoli' : 'všechny'}</button
             >
           </h3>
           <div class="chips">
@@ -317,23 +377,23 @@
         </section>
 
         <section>
-          <h3>Wanted by</h3>
+          <h3>Chce to</h3>
           <select
             bind:value={filters.wantOf}
             onchange={refresh}
-            aria-label="Whose want rating to filter by"
+            aria-label="Podle čího hodnocení filtrovat"
           >
-            <option value="either">Either of us</option>
+            <option value="either">Kdokoli z nás</option>
             <option value={settings.activePerson}>{settings.personNames[settings.activePerson]}</option>
             <option value={otherPerson(settings.activePerson)}>
               {settings.personNames[otherPerson(settings.activePerson)]}
             </option>
           </select>
           <div class="row want-row">
-            <span class="muted">at least</span>
+            <span class="muted">aspoň</span>
             <WantStars
               value={filters.minWant as WantLevel}
-              label="Minimum want level"
+              label="Minimální míra zájmu"
               size="sm"
               onchange={(value) => {
                 filters.minWant = value;
@@ -344,34 +404,34 @@
         </section>
 
         <section>
-          <h3>Price</h3>
+          <h3>Cena</h3>
           <div class="row">
             <input
               type="number"
-              placeholder="min"
+              placeholder="od"
               value={filters.priceMin ?? ''}
               oninput={(event) => {
                 filters.priceMin = event.currentTarget.value ? Number(event.currentTarget.value) : undefined;
                 refresh();
               }}
-              aria-label="Minimum price"
+              aria-label="Cena od"
             />
             <input
               type="number"
-              placeholder="max"
+              placeholder="do"
               value={filters.priceMax ?? ''}
               oninput={(event) => {
                 filters.priceMax = event.currentTarget.value ? Number(event.currentTarget.value) : undefined;
                 refresh();
               }}
-              aria-label="Maximum price"
+              aria-label="Cena do"
             />
           </div>
         </section>
 
         {#if sites.length > 1}
           <section>
-            <h3>Shop</h3>
+            <h3>Obchod</h3>
             <div class="chips">
               {#each sites as site (site)}
                 <button
@@ -390,16 +450,16 @@
         {/if}
 
         <section>
-          <h3>Added by</h3>
+          <h3>Přidal(a)</h3>
           <select
             value={filters.addedBy ?? ''}
             onchange={(event) => {
               filters.addedBy = (event.currentTarget.value || undefined) as PersonId | undefined;
               refresh();
             }}
-            aria-label="Filter by who added the item"
+            aria-label="Filtrovat podle toho, kdo položku přidal"
           >
-            <option value="">Anyone</option>
+            <option value="">Kdokoli</option>
             <option value="a">{settings.personNames.a}</option>
             <option value="b">{settings.personNames.b}</option>
           </select>
@@ -407,7 +467,7 @@
 
         {#if activeFilterCount > 0}
           <button class="btn btn-sm" onclick={resetFilters}>
-            Clear {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+            Zrušit filtry ({activeFilterCount})
           </button>
         {/if}
       </aside>
@@ -415,46 +475,59 @@
       <main class="content">
         {#if selected.size > 0}
           <div class="bulkbar card">
-            <span><strong>{selected.size}</strong> selected</span>
+            <span>Vybráno: <strong>{selected.size}</strong></span>
             <div class="row wrap">
               <button class="btn btn-sm" onclick={() => bulk(() => bulkSetStatus([...selected], 'bought'))}>
-                Mark bought
+                Koupeno
               </button>
               <button class="btn btn-sm" onclick={() => bulk(() => bulkSetStatus([...selected], 'dropped'))}>
-                Not wanted
+                Už nechceme
               </button>
               <button class="btn btn-sm" onclick={() => bulk(() => bulkSetStatus([...selected], 'wanted'))}>
-                Back to wanted
+                Zpět mezi chtěné
               </button>
               <select
-                aria-label="Add tag to selected"
+                aria-label="Přidat vybraným štítek"
                 onchange={(event) => {
                   const tagId = event.currentTarget.value;
                   if (tagId) void bulk(() => bulkAddTag([...selected], tagId));
                   event.currentTarget.value = '';
                 }}
               >
-                <option value="">Add tag…</option>
+                <option value="">Přidat štítek…</option>
                 {#each tags as tag (tag.id)}
                   <option value={tag.id}>{tag.name}</option>
                 {/each}
               </select>
               <select
-                aria-label="Set category for selected"
+                aria-label="Přidat vybrané do seznamu"
+                onchange={(event) => {
+                  const listId = event.currentTarget.value;
+                  if (listId) void bulk(() => bulkAddToList([...selected], listId));
+                  event.currentTarget.value = '';
+                }}
+              >
+                <option value="">Přidat do seznamu…</option>
+                {#each lists as entry (entry.id)}
+                  <option value={entry.id}>{entry.name}</option>
+                {/each}
+              </select>
+              <select
+                aria-label="Nastavit vybraným kategorii"
                 onchange={(event) => {
                   const value = event.currentTarget.value;
                   if (value) void bulk(() => bulkSetCategory([...selected], value));
                   event.currentTarget.value = '';
                 }}
               >
-                <option value="">Set category…</option>
+                <option value="">Nastavit kategorii…</option>
                 {#each categories as category (category.id)}
                   <!-- Native <option> can't hold an SVG, so the select shows names only. -->
                   <option value={category.id}>{category.name}</option>
                 {/each}
               </select>
               <button class="btn btn-ghost btn-sm" onclick={() => (selected = new Set())}>
-                Clear
+                Zrušit výběr
               </button>
             </div>
           </div>
@@ -470,25 +543,27 @@
               {/if}
             </div>
             {#if totalCount === 0}
-              <h2>Nothing saved yet</h2>
+              <h2>Zatím tu nic není</h2>
               <p class="muted">
-                Open a product page and press the Pluck button, use Ctrl+Shift+S, or right-click and
-                choose "Save this page to Pluck".
+                Otevři stránku s produktem a klikni na ikonu Pluck, zmáčkni Ctrl+Shift+S, nebo
+                klikni pravým tlačítkem a zvol „Uložit stránku do Plucku“.
               </p>
             {:else}
-              <h2>Nothing matches</h2>
-              <p class="muted">{totalCount} items are saved, but none fit the current filters.</p>
-              <button class="btn btn-sm" onclick={resetFilters}>Clear filters</button>
+              <h2>Nic neodpovídá</h2>
+              <p class="muted">
+                Uloženo máš {totalCount} položek, ale žádná nesedí na aktuální filtry.
+              </p>
+              <button class="btn btn-sm" onclick={resetFilters}>Zrušit filtry</button>
             {/if}
           </div>
         {:else}
           <div class="listhead spread">
             <button class="btn btn-ghost btn-sm" onclick={selectAll}>
-              {selected.size === items.length ? 'Deselect all' : 'Select all'}
+              {selected.size === items.length ? 'Zrušit výběr' : 'Vybrat vše'}
             </button>
             {#if totalValue > 0}
               <span class="muted">
-                Wanted items total {formatPrice({
+                Chtěné položky celkem {formatPrice({
                   amount: totalValue,
                   currency: settings.defaultCurrency,
                   raw: '',
@@ -549,6 +624,7 @@
             personNames={settings.personNames}
             {categories}
             {tags}
+            {lists}
             currency={settings.defaultCurrency}
             onclose={() => (openItemId = null)}
             onchange={refresh}
@@ -563,6 +639,7 @@
       {settings}
       {categories}
       {tags}
+      {lists}
       onclose={() => (showSettings = false)}
       onchange={async () => {
         settings = await loadSettings();
@@ -696,6 +773,18 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-dim);
+  }
+
+  .lock {
+    display: inline-flex;
+    color: var(--gift);
+    flex-shrink: 0;
+  }
+
+  .count-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
   }
 
   .mode {

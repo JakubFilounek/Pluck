@@ -1,8 +1,8 @@
 <script lang="ts">
   import { captureActiveTab } from '@/src/capture';
   import { seedDefaults } from '@/src/data/db';
-  import { createItem, deleteItem } from '@/src/data/mutations';
-  import { findDuplicate, listCategories, listTags } from '@/src/data/queries';
+  import { createItem, deleteItem, setItemInList } from '@/src/data/mutations';
+  import { findDuplicate, listCategories, listLists, listTags } from '@/src/data/queries';
   import { formatPrice, parsePrice } from '@/src/extract';
   import { otherPerson, loadSettings, saveSettings, type Settings } from '@/src/settings';
   import PersonToggle from '@/src/ui/PersonToggle.svelte';
@@ -13,7 +13,15 @@
   import TechScene from '@/src/ui/TechScene.svelte';
   import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
   import { applyAppearance } from '@/src/ui/theme';
-  import type { CaptureCandidate, Category, Item, Tag, WantLevel } from '@/src/domain/types';
+  import { DEFAULT_LIST_ID } from '@/src/data/db';
+  import type {
+    CaptureCandidate,
+    Category,
+    Item,
+    PluckList,
+    Tag,
+    WantLevel,
+  } from '@/src/domain/types';
 
   /**
    * Capture flow. The extracted data is shown as an editable form rather than saved
@@ -32,6 +40,9 @@
   let candidate = $state<CaptureCandidate | null>(null);
   let categories = $state<Category[]>([]);
   let tags = $state<Tag[]>([]);
+  /** Only lists this person may see — a private list of the other's never appears. */
+  let lists = $state<PluckList[]>([]);
+  let selectedLists = $state<string[]>([]);
   /**
    * The already-saved copy of this page, if the current person can see one. A copy
    * that is a gift for them stays invisible here — see findDuplicate.
@@ -68,7 +79,16 @@
       cleanupTheme = applyAppearance(loaded.theme, loaded.activePerson);
 
       await seedDefaults();
-      [categories, tags] = await Promise.all([listCategories(), listTags()]);
+      [categories, tags, lists] = await Promise.all([
+        listCategories(),
+        listTags(),
+        listLists(loaded.activePerson),
+      ]);
+
+      // Default into the shared starter list when it still exists, otherwise the
+      // first visible one — so a capture is never accidentally unfiled.
+      const fallback = lists.find((entry) => entry.id === DEFAULT_LIST_ID) ?? lists[0];
+      selectedLists = fallback ? [fallback.id] : [];
 
       const result = await captureActiveTab(loaded.defaultCurrency);
 
@@ -114,6 +134,37 @@
       : [...selectedTags, tagId];
   }
 
+  function toggleList(listId: string) {
+    selectedLists = selectedLists.includes(listId)
+      ? selectedLists.filter((id) => id !== listId)
+      : [...selectedLists, listId];
+  }
+
+  /**
+   * Adds or removes the already-saved item from one list, straight away — this is the
+   * tick-list you get once something is saved.
+   */
+  async function toggleExistingList(listId: string, member: boolean) {
+    if (!existing) return;
+
+    failure = '';
+
+    try {
+      await setItemInList(existing.id, listId, member);
+      browser.runtime.sendMessage({ type: 'pluck:items-changed' }).catch(() => {});
+      await refreshExisting();
+
+      // Removing it from the last list it was in leaves it unfiled, not deleted.
+      if (existing && existing.listIds.length === 0) {
+        message = 'Položka teď není v žádném seznamu.';
+      } else {
+        message = '';
+      }
+    } catch (error) {
+      failure = `Nepodařilo se změnit seznamy — ${describe(error)}`;
+    }
+  }
+
   async function save() {
     if (!candidate || !settings || busy) return;
 
@@ -133,6 +184,7 @@
         want: want || undefined,
         categoryId,
         tagIds: selectedTags,
+        listIds: selectedLists,
         giftFor: giftFor || undefined,
         notes: notes.trim() || undefined,
       });
@@ -210,12 +262,12 @@
   </header>
 
   {#if phase === 'loading'}
-    <p class="muted pad">Reading this page…</p>
+    <p class="muted pad">Načítám stránku…</p>
   {:else if phase === 'error'}
     <div class="pad stack">
       <p>{message}</p>
       {#if failure}<p class="failure">{failure}</p>{/if}
-      <button class="btn" onclick={openDashboard}>Open dashboard</button>
+      <button class="btn" onclick={openDashboard}>Otevřít přehled</button>
     </div>
   {:else if phase === 'saved'}
     <div class="pad done">
@@ -230,22 +282,50 @@
         <div class="intro row">
           <span class="check-badge"><Icon name="check" size={13} weight={3} /></span>
           <div class="min">
-            <h1>Already added</h1>
+            <h1>Už přidáno</h1>
             <p class="muted truncate">
-              on {new Date(existing.createdAt).toLocaleDateString()}
+              {new Date(existing.createdAt).toLocaleDateString('cs-CZ')}
               {#if existing.giftFor && settings}
-                · gift for {settings.personNames[existing.giftFor]}
+                · dárek pro {settings.personNames[existing.giftFor]}
               {/if}
             </p>
           </div>
+        </div>
+
+        <!-- Which lists it is in, and a tick to add or remove it from each. Only
+             lists this person can see appear, so this cannot reveal a private one. -->
+        <div class="lists card">
+          <span class="field-label">
+            {existing.listIds.length === 0
+              ? 'V žádném seznamu'
+              : existing.listIds.length === 1
+                ? 'V 1 seznamu'
+                : existing.listIds.length < 5
+                  ? `Ve ${existing.listIds.length} seznamech`
+                  : `V ${existing.listIds.length} seznamech`}
+          </span>
+          {#each lists as entry (entry.id)}
+            <label class="list-row">
+              <input
+                type="checkbox"
+                checked={existing.listIds.includes(entry.id)}
+                onchange={(event) => toggleExistingList(entry.id, event.currentTarget.checked)}
+              />
+              <Icon name={entry.icon} size={13} weight={1.9} />
+              <span class="truncate">{entry.name}</span>
+              {#if entry.visibility === 'private'}
+                <span class="badge">soukromý</span>
+              {/if}
+            </label>
+          {/each}
         </div>
       {:else}
         <!-- Say plainly what is about to happen. "Save" on its own read as saving
              something generic rather than adding this page as an item. -->
         <div class="intro">
-          <h1>Add this product</h1>
+          <h1>Přidat tento produkt</h1>
           <p class="muted truncate">
-            from <strong>{candidate.site}</strong> · check the details, then add it
+            z <strong>{candidate.site}</strong> · zkontroluj údaje a přidej
           </p>
         </div>
       {/if}
@@ -260,8 +340,8 @@
 
       {#if candidate.source === 'fallback'}
         <p class="notice">
-          Couldn't read this page's details — only its title and link came through. Fill in
-          anything you want by hand below.
+          Nepodařilo se přečíst detaily stránky — máme jen název a odkaz. Zbytek můžeš doplnit
+          ručně níže.
         </p>
       {/if}
 
@@ -281,17 +361,17 @@
 
       <div class="fields">
         <div>
-          <label for="title">Title</label>
+          <label for="title">Název</label>
           <input id="title" bind:value={title} />
         </div>
 
         <div class="two">
           <div>
-            <label for="price">Price {previewPrice ? `· ${previewPrice}` : ''}</label>
-            <input id="price" bind:value={priceText} placeholder="not detected" />
+            <label for="price">Cena {previewPrice ? `· ${previewPrice}` : ''}</label>
+            <input id="price" bind:value={priceText} placeholder="nenalezena" />
           </div>
           <div>
-            <label for="category">Category</label>
+            <label for="category">Kategorie</label>
             <select id="category" bind:value={categoryId}>
               <option value={undefined}>—</option>
               {#each categories as category (category.id)}
@@ -302,15 +382,37 @@
           </div>
         </div>
 
+        {#if !existing && lists.length > 0}
+          <div>
+            <span class="field-label">Do kterých seznamů</span>
+            <div class="lists">
+              {#each lists as entry (entry.id)}
+                <label class="list-row">
+                  <input
+                    type="checkbox"
+                    checked={selectedLists.includes(entry.id)}
+                    onchange={() => toggleList(entry.id)}
+                  />
+                  <Icon name={entry.icon} size={13} weight={1.9} />
+                  <span class="truncate">{entry.name}</span>
+                  {#if entry.visibility === 'private'}
+                    <span class="badge">soukromý</span>
+                  {/if}
+                </label>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
         <div>
-          <label for="want-stars">How much do you want it?</label>
+          <label for="want-stars">Jak moc to chceš?</label>
           <div id="want-stars">
-            <WantStars value={want} label="Want level" onchange={(value) => (want = value)} />
+            <WantStars value={want} label="Míra zájmu" onchange={(value) => (want = value)} />
           </div>
         </div>
 
         <div>
-          <span class="field-label">Tags</span>
+          <span class="field-label">Štítky</span>
           <div class="tags">
             {#each tags as tag (tag.id)}
               <TagChip
@@ -323,12 +425,12 @@
         </div>
 
         <div>
-          <label for="gift">Gift for</label>
+          <label for="gift">Dárek pro</label>
           <select id="gift" bind:value={giftFor}>
-            <option value="">Nobody — it's for us</option>
+            <option value="">Nikoho — je to pro nás</option>
             {#if settings}
               <option value={otherPerson(settings.activePerson)}>
-                {otherName} (hidden from them)
+                {otherName} (schová se před ní/ním)
               </option>
               <option value={settings.activePerson}>
                 {settings.personNames[settings.activePerson]}
@@ -339,12 +441,12 @@
 
         {#if showNotes}
           <div>
-            <label for="notes">Notes</label>
+            <label for="notes">Poznámka</label>
             <textarea id="notes" bind:value={notes}></textarea>
           </div>
         {:else}
           <button class="btn btn-ghost btn-sm" onclick={() => (showNotes = true)}>
-            + Add a note
+            + Přidat poznámku
           </button>
         {/if}
       </div>
@@ -352,17 +454,17 @@
 
     <footer class="spread">
       <button class="btn btn-ghost btn-sm" onclick={openDashboard}>
-        All items <Icon name="arrowRight" size={13} weight={2} />
+        Vše <Icon name="arrowRight" size={13} weight={2} />
       </button>
       {#if existing}
         <button class="btn add added" onclick={removeExisting} disabled={busy}>
           <Icon name="check" size={15} weight={2.4} />
-          Added — click to remove
+          Přidáno — klikni pro odebrání
         </button>
       {:else}
         <button class="btn btn-primary add" onclick={save} disabled={busy}>
           <Icon name="plus" size={15} weight={2.2} />
-          Add to {settings ? settings.personNames[settings.activePerson] : 'my'} list
+          Přidat do seznamu
         </button>
       {/if}
     </footer>
@@ -460,6 +562,36 @@
 
   .min {
     min-width: 0;
+  }
+
+  .lists {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .lists.card {
+    padding: 9px 10px;
+  }
+
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--text);
+    text-transform: none;
+    margin: 0;
+    cursor: pointer;
+    min-width: 0;
+  }
+
+  .list-row input {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
   }
 
   .failure {

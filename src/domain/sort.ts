@@ -13,15 +13,15 @@ export type SortMode =
   | 'site';
 
 export const SORT_LABELS: Record<SortMode, string> = {
-  'want-combined': 'Most wanted',
-  'want-mine': 'Wanted by me',
-  'want-theirs': 'Wanted by them',
-  'price-asc': 'Cheapest first',
-  'price-desc': 'Most expensive',
-  newest: 'Recently added',
-  oldest: 'Oldest first',
-  title: 'Title A–Z',
-  site: 'Shop',
+  'want-combined': 'Nejvíc chtěné',
+  'want-mine': 'Chci já',
+  'want-theirs': 'Chce ten druhý',
+  'price-asc': 'Nejlevnější',
+  'price-desc': 'Nejdražší',
+  newest: 'Nedávno přidané',
+  oldest: 'Nejstarší',
+  title: 'Název A–Z',
+  site: 'Obchod',
 };
 
 /** Unpriced items sort last in both directions rather than pretending to cost zero. */

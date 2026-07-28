@@ -1,7 +1,22 @@
 <script lang="ts">
-  import { PERSON_IDS, type Category, type Item, type PersonId, type Tag, type WantLevel } from '../domain/types';
+  import {
+    PERSON_IDS,
+    type Category,
+    type Item,
+    type PersonId,
+    type PluckList,
+    type Tag,
+    type WantLevel,
+  } from '../domain/types';
   import { formatPrice, parsePrice } from '../extract/price';
-  import { deleteItem, markBought, setStatus, setWant, updateItem } from '../data/mutations';
+  import {
+    deleteItem,
+    markBought,
+    setItemInList,
+    setStatus,
+    setWant,
+    updateItem,
+  } from '../data/mutations';
   import { otherPerson } from '../settings';
   import Icon from './Icon.svelte';
   import TagChip from './TagChip.svelte';
@@ -13,12 +28,14 @@
     personNames: Record<PersonId, string>;
     categories: Category[];
     tags: Tag[];
+    /** Only lists the viewer may see — never the other person's private ones. */
+    lists: PluckList[];
     currency: string;
     onclose: () => void;
     onchange: () => void;
   };
 
-  let { item, viewer, personNames, categories, tags, currency, onclose, onchange }: Props =
+  let { item, viewer, personNames, categories, tags, lists, currency, onclose, onchange }: Props =
     $props();
 
   /**
@@ -77,6 +94,11 @@
     onchange();
   }
 
+  async function toggleList(listId: string, member: boolean) {
+    await setItemInList(item.id, listId, member);
+    onchange();
+  }
+
   async function confirmBought() {
     await markBought(
       item.id,
@@ -100,10 +122,10 @@
   }
 </script>
 
-<aside class="drawer" aria-label="Item details">
+<aside class="drawer" aria-label="Detail položky">
   <header class="spread">
-    <h2>Details</h2>
-    <button class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close details">
+    <h2>Detail</h2>
+    <button class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Zavřít detail">
       <Icon name="close" size={15} />
     </button>
   </header>
@@ -114,17 +136,17 @@
     {/if}
 
     <div>
-      <label for="d-title">Title</label>
+      <label for="d-title">Název</label>
       <input id="d-title" bind:value={title} onblur={persist} />
     </div>
 
     <div>
-      <label for="d-price">Price {priceText ? `· ${formatPrice(parsePrice(priceText, currency))}` : ''}</label>
-      <input id="d-price" bind:value={priceText} onblur={persist} placeholder="not detected" />
+      <label for="d-price">Cena {priceText ? `· ${formatPrice(parsePrice(priceText, currency))}` : ''}</label>
+      <input id="d-price" bind:value={priceText} onblur={persist} placeholder="nenalezena" />
     </div>
 
     <div>
-      <label for="d-category">Category</label>
+      <label for="d-category">Kategorie</label>
       <select id="d-category" bind:value={categoryId} onchange={persist}>
         <option value={undefined}>—</option>
         {#each categories as category (category.id)}
@@ -135,7 +157,29 @@
     </div>
 
     <div>
-      <span class="field-label">Tags</span>
+      <span class="field-label">
+        Seznamy{item.listIds.length === 0 ? ' — v žádném' : ` (${item.listIds.length})`}
+      </span>
+      <div class="lists">
+        {#each lists as entry (entry.id)}
+          <label class="list-row">
+            <input
+              type="checkbox"
+              checked={item.listIds.includes(entry.id)}
+              onchange={(event) => toggleList(entry.id, event.currentTarget.checked)}
+            />
+            <Icon name={entry.icon} size={13} weight={1.9} />
+            <span class="truncate">{entry.name}</span>
+            {#if entry.visibility === 'private'}
+              <span class="badge">soukromý</span>
+            {/if}
+          </label>
+        {/each}
+      </div>
+    </div>
+
+    <div>
+      <span class="field-label">Štítky</span>
       <div class="tags">
         {#each tags as tag (tag.id)}
           <TagChip {tag} selected={item.tagIds.includes(tag.id)} onclick={() => toggleTag(tag.id)} />
@@ -144,13 +188,13 @@
     </div>
 
     <div>
-      <span class="field-label">Want level</span>
+      <span class="field-label">Míra zájmu</span>
       <div class="wants">
         {#each PERSON_IDS as person (person)}
           <span class="truncate">{personNames[person]}</span>
           <WantStars
             value={item.want[person]}
-            label="{personNames[person]} wants this"
+            label="{personNames[person]} — míra zájmu"
             onchange={(value) => rate(person, value)}
           />
         {/each}
@@ -158,30 +202,30 @@
     </div>
 
     <div>
-      <label for="d-gift">Gift for</label>
+      <label for="d-gift">Dárek pro</label>
       <select id="d-gift" bind:value={giftFor} onchange={persist}>
-        <option value="">Nobody — it's for us</option>
+        <option value="">Nikoho — je to pro nás</option>
         <option value={otherPerson(viewer)}>
-          {personNames[otherPerson(viewer)]} (hidden from them)
+          {personNames[otherPerson(viewer)]} (schová se před ní/ním)
         </option>
         <option value={viewer}>{personNames[viewer]}</option>
       </select>
       {#if giftFor === viewer}
-        <p class="hint">You won't see this once you switch away and back.</p>
+        <p class="hint">Až přepneš na druhou osobu a zpět, sám(a) to už neuvidíš.</p>
       {/if}
     </div>
 
     <div>
-      <label for="d-notes">Notes</label>
+      <label for="d-notes">Poznámka</label>
       <textarea id="d-notes" bind:value={notes} onblur={persist}></textarea>
     </div>
 
     <div>
-      <span class="field-label">Status</span>
+      <span class="field-label">Stav</span>
       {#if buying}
         <div class="card sub-form stack">
           <div>
-            <label for="b-who">Bought by</label>
+            <label for="b-who">Koupil(a)</label>
             <select id="b-who" bind:value={boughtBy}>
               {#each PERSON_IDS as person (person)}
                 <option value={person}>{personNames[person]}</option>
@@ -189,33 +233,33 @@
             </select>
           </div>
           <div>
-            <label for="b-price">Actually paid</label>
+            <label for="b-price">Skutečně zaplaceno</label>
             <input id="b-price" bind:value={boughtPriceText} />
           </div>
           <div>
-            <label for="b-date">When</label>
+            <label for="b-date">Kdy</label>
             <input id="b-date" type="date" bind:value={boughtAt} />
           </div>
           <div class="row">
-            <button class="btn btn-primary btn-sm" onclick={confirmBought}>Confirm</button>
-            <button class="btn btn-sm" onclick={() => (buying = false)}>Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick={confirmBought}>Potvrdit</button>
+            <button class="btn btn-sm" onclick={() => (buying = false)}>Zrušit</button>
           </div>
         </div>
       {:else}
         <div class="row wrap">
           {#if item.status !== 'bought'}
             <button class="btn btn-sm" onclick={() => (buying = true)}>
-              <Icon name="check" size={14} weight={2} /> Mark bought
+              <Icon name="check" size={14} weight={2} /> Označit jako koupené
             </button>
           {/if}
           {#if item.status !== 'dropped'}
             <button class="btn btn-sm" onclick={() => changeStatus('dropped')}>
-              Don't want any more
+              Už nechci
             </button>
           {/if}
           {#if item.status !== 'wanted'}
             <button class="btn btn-sm" onclick={() => changeStatus('wanted')}>
-              Back to wanted
+              Zpět mezi chtěné
             </button>
           {/if}
         </div>
@@ -223,33 +267,36 @@
 
       {#if item.status === 'bought' && item.boughtBy}
         <p class="hint">
-          Bought by {personNames[item.boughtBy]}
-          {#if item.boughtPrice}for {formatPrice(item.boughtPrice)}{/if}
-          {#if item.boughtAt}on {new Date(item.boughtAt).toLocaleDateString()}{/if}.
+          Koupil(a) {personNames[item.boughtBy]}
+          {#if item.boughtPrice}za {formatPrice(item.boughtPrice)}{/if}
+          {#if item.boughtAt}dne {new Date(item.boughtAt).toLocaleDateString('cs-CZ')}{/if}.
         </p>
       {/if}
     </div>
 
     <div class="meta muted">
       <a class="ext" href={item.url} target="_blank" rel="noreferrer noopener">
-        Open on {item.site}
+        Otevřít na {item.site}
         <Icon name="external" size={12} weight={2} />
       </a>
-      <span>Added by {personNames[item.addedBy]} on {new Date(item.createdAt).toLocaleDateString()}</span>
-      {#if item.brand}<span>Brand: {item.brand}</span>{/if}
+      <span>
+        Přidal(a) {personNames[item.addedBy]}
+        {new Date(item.createdAt).toLocaleDateString('cs-CZ')}
+      </span>
+      {#if item.brand}<span>Značka: {item.brand}</span>{/if}
       {#if item.availability}<span>Availability when saved: {item.availability}</span>{/if}
     </div>
 
     <div class="danger-zone">
       {#if confirmingDelete}
-        <p class="hint">Delete permanently? "Don't want any more" keeps it recoverable.</p>
+        <p class="hint">Smazat natrvalo? Volba „Už nechci“ ji nechá obnovitelnou.</p>
         <div class="row">
-          <button class="btn btn-sm btn-danger" onclick={remove}>Delete for good</button>
-          <button class="btn btn-sm" onclick={() => (confirmingDelete = false)}>Cancel</button>
+          <button class="btn btn-sm btn-danger" onclick={remove}>Nenávratně smazat</button>
+          <button class="btn btn-sm" onclick={() => (confirmingDelete = false)}>Zrušit</button>
         </div>
       {:else}
         <button class="btn btn-ghost btn-sm btn-danger" onclick={() => (confirmingDelete = true)}>
-          Delete
+          Smazat
         </button>
       {/if}
     </div>
@@ -294,6 +341,32 @@
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
+  }
+
+  .lists {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--text);
+    text-transform: none;
+    margin: 0;
+    cursor: pointer;
+    min-width: 0;
+  }
+
+  .list-row input {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
   }
 
   .wants {

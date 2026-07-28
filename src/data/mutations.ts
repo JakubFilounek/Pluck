@@ -4,7 +4,9 @@ import type {
   Category,
   Item,
   ItemStatus,
+  ListVisibility,
   PersonId,
+  PluckList,
   Price,
   Tag,
   WantLevel,
@@ -26,6 +28,7 @@ export type NewItemInput = {
   want?: WantLevel;
   categoryId?: string;
   tagIds?: string[];
+  listIds?: string[];
   giftFor?: PersonId;
   notes?: string;
 };
@@ -45,6 +48,7 @@ export async function createItem(input: NewItemInput): Promise<Item> {
     availability: input.candidate.availability,
     categoryId: input.categoryId,
     tagIds: input.tagIds ?? [],
+    listIds: input.listIds ?? [],
     // The person saving it is the one whose want-rating we record; the other person
     // rates it themselves later, and an unrated item simply has no entry.
     want: input.want ? { [input.addedBy]: input.want } : {},
@@ -154,6 +158,79 @@ export async function bulkSetCategory(ids: string[], categoryId?: string): Promi
 }
 
 /** `icon` is a name from src/ui/icons.ts, not a glyph. */
+/** Adds or removes a single item from one list. */
+export async function setItemInList(
+  itemId: string,
+  listId: string,
+  member: boolean,
+): Promise<void> {
+  const item = await db.items.get(itemId);
+  if (!item) return;
+
+  const current = item.listIds ?? [];
+  if (member === current.includes(listId)) return;
+
+  await updateItem(itemId, {
+    listIds: member ? [...current, listId] : current.filter((id) => id !== listId),
+  });
+}
+
+export async function bulkAddToList(ids: string[], listId: string): Promise<void> {
+  await db.transaction('rw', db.items, async () => {
+    for (const id of ids) await setItemInList(id, listId, true);
+  });
+}
+
+export async function createList(
+  name: string,
+  icon: string,
+  color: string,
+  visibility: ListVisibility,
+  ownerId: PersonId,
+): Promise<PluckList> {
+  const maxOrder = (await db.lists.orderBy('sortOrder').last())?.sortOrder ?? -1;
+
+  const list: PluckList = {
+    id: newId('list'),
+    name,
+    icon,
+    color,
+    visibility,
+    ownerId,
+    sortOrder: maxOrder + 1,
+    createdAt: now(),
+  };
+
+  await db.lists.add(list);
+  return list;
+}
+
+export async function updateList(
+  listId: string,
+  patch: Partial<Pick<PluckList, 'name' | 'icon' | 'color' | 'visibility'>>,
+): Promise<void> {
+  await db.lists.update(listId, patch);
+}
+
+/**
+ * Deleting a list detaches it from its items rather than deleting them.
+ *
+ * The items become unfiled, which means visible to both people — so a private list
+ * is emptied of its privacy along with its membership. That is stated in the delete
+ * confirmation rather than left as a surprise.
+ */
+export async function deleteList(listId: string): Promise<void> {
+  await db.transaction('rw', db.lists, db.items, async () => {
+    const affected = await db.items.where('listIds').equals(listId).toArray();
+
+    for (const item of affected) {
+      await updateItem(item.id, { listIds: item.listIds.filter((id) => id !== listId) });
+    }
+
+    await db.lists.delete(listId);
+  });
+}
+
 export async function createCategory(name: string, icon: string): Promise<Category> {
   const maxOrder = (await db.categories.orderBy('sortOrder').last())?.sortOrder ?? -1;
   const category: Category = { id: newId('cat'), name, icon, sortOrder: maxOrder + 1 };
