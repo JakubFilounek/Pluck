@@ -27,13 +27,15 @@
 /* Blue / tech. Cool, high contrast, a little bit terminal.                   */
 
 :root[data-person='a'] {
-  --bg: #eaf1fb;
-  --bg-2: #dbe7f8;
+  --bg: #e7eef9;
+  --bg-2: #d6e3f6;
   --surface: #ffffff;
-  --surface-2: #e4edfa;
-  --border: #c4d7f0;
-  --text: #0d1729;
-  --text-dim: #50688f;
+  --surface-2: #dfe9f8;
+  /* Darker border and dim text than before: both were too faint to separate
+     panels or to read comfortably at 11–12px. */
+  --border: #a9c3e6;
+  --text: #05101f;
+  --text-dim: #3d5578;
   --accent: #0a63c4;
   --accent-2: #0093b8;
   --accent-soft: #d6e6fb;
@@ -50,25 +52,28 @@
 }
 
 :root[data-person='a'][data-theme='dark'] {
-  --bg: #0a1220;
-  --bg-2: #0e1a2c;
-  --surface: #16233a;
-  --surface-2: #1f3150;
-  --border: #33496f;
-  --text: #eaf2ff;
-  --text-dim: #a2bade;
-  --accent: #59a7ff;
-  --accent-2: #34d7f0;
-  --accent-soft: #1b3a63;
-  --accent-ghost: rgba(89, 167, 255, 0.28);
-  --want: #ffb648;
-  --ok: #45c98a;
-  --danger: #ff7b6b;
-  --gift: #b98cff;
-  --glow: rgba(89, 167, 255, 0.5);
+  /* Deeper, colder background with brighter surfaces above it — the previous set
+     sat too close together and secondary text washed into the panels. */
+  --bg: #050b14;
+  --bg-2: #0a1522;
+  --surface: #101d31;
+  --surface-2: #1b2d4a;
+  --border: #3d5a86;
+  --text: #f2f8ff;
+  --text-dim: #b8cdea;
+  /* Terminal green-cyan alongside the blue: reads as a console rather than a form. */
+  --accent: #4dd0ff;
+  --accent-2: #57f2b0;
+  --accent-soft: #123152;
+  --accent-ghost: rgba(77, 208, 255, 0.3);
+  --want: #ffc247;
+  --ok: #57f2b0;
+  --danger: #ff8577;
+  --gift: #c39cff;
+  --glow: rgba(77, 208, 255, 0.55);
   /* The dark accents are light colours, so filled buttons take dark text —
      white on #59a7ff fails contrast badly. */
-  --on-accent: #07172c;
+  --on-accent: #04121f;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 26px rgba(0, 0, 0, 0.42);
 
   color-scheme: dark;
@@ -78,22 +83,22 @@
 /* Pastel pink / cats. Soft, warm, rounded.                                   */
 
 :root[data-person='b'] {
-  --bg: #fdf1f6;
-  --bg-2: #fbe4ee;
+  --bg: #fceef4;
+  --bg-2: #f9dfec;
   --surface: #ffffff;
-  --surface-2: #fce8f1;
-  --border: #f6cfe1;
-  --text: #3a2130;
-  --text-dim: #8f6178;
-  --accent: #db5f97;
-  --accent-2: #b681dd;
-  --accent-soft: #fcdcea;
-  --accent-ghost: rgba(219, 95, 151, 0.22);
-  --want: #e8973f;
-  --ok: #3f9c72;
-  --danger: #cf4d5f;
-  --gift: #9b62cf;
-  --glow: rgba(219, 95, 151, 0.35);
+  --surface-2: #fbe3ee;
+  --border: #eeb9d3;
+  --text: #2b1420;
+  --text-dim: #7a4a61;
+  --accent: #c94480;
+  --accent-2: #9a5fc9;
+  --accent-soft: #fbd4e6;
+  --accent-ghost: rgba(201, 68, 128, 0.24);
+  --want: #cc7a1a;
+  --ok: #2f8560;
+  --danger: #c0384c;
+  --gift: #8348bb;
+  --glow: rgba(201, 68, 128, 0.35);
   --on-accent: #ffffff;
   --cat-black: #241a22;
   --cat-white: #ffffff;
@@ -107,21 +112,21 @@
 }
 
 :root[data-person='b'][data-theme='dark'] {
-  --bg: #1c1119;
-  --bg-2: #261823;
-  --surface: #2f1f2b;
-  --surface-2: #3f2b39;
-  --border: #573b4d;
-  --text: #fdeef5;
-  --text-dim: #d3a8bf;
-  --accent: #ff9ecb;
-  --accent-2: #d3a5f0;
-  --accent-soft: #4a2b3e;
-  --accent-ghost: rgba(255, 158, 203, 0.28);
-  --want: #ffc06a;
-  --ok: #5fd3a0;
-  --danger: #ff8a94;
-  --gift: #cfa4ff;
+  --bg: #150b11;
+  --bg-2: #1f1019;
+  --surface: #291a24;
+  --surface-2: #3b2634;
+  --border: #6b4459;
+  --text: #fff2f8;
+  --text-dim: #e0b8cd;
+  --accent: #ffa8d2;
+  --accent-2: #dcaaf7;
+  --accent-soft: #47283a;
+  --accent-ghost: rgba(255, 168, 210, 0.3);
+  --want: #ffc87a;
+  --ok: #6ee0b0;
+  --danger: #ff96a0;
+  --gift: #d8b0ff;
   --glow: rgba(255, 158, 203, 0.5);
   --on-accent: #38121f;
   /* A true-black cat vanishes into a dark background — only its eyes survived.

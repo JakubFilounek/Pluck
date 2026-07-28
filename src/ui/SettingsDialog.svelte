@@ -422,9 +422,12 @@
   .panel {
     width: 520px;
     max-width: 100%;
-    max-height: 100%;
+    /* An explicit height rather than max-height: the panel must be a bounded flex
+       container before its scroll area has anything to scroll within. */
+    max-height: calc(100vh - 40px);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     text-align: left;
     cursor: default;
   }
@@ -432,6 +435,7 @@
   header {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
   }
 
   h2 {
@@ -450,6 +454,12 @@
     padding: 14px;
     overflow-y: auto;
     gap: 20px;
+    /* flex:1 with min-height:0 is what actually lets this shrink and scroll — a flex
+       child defaults to min-height:auto, so the content pushed the panel taller
+       instead of overflowing into a scroll area. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overscroll-behavior: contain;
   }
 
   section {

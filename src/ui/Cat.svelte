@@ -125,6 +125,25 @@
     opacity: 0.18;
   }
 
+  /*
+   * transform-box: fill-box everywhere that transforms.
+   *
+   * CSS transform-origin on an SVG element resolves against the whole view-box by
+   * default, so `transform-origin: center` meant the centre of the 320x128 scene,
+   * roughly 150 units away from the part being scaled. The torso appeared to stretch
+   * across the floor and the eyes flew out of the head. fill-box makes each origin
+   * relative to that element's own bounding box, which is what every rule here wants.
+   */
+  .torso,
+  .head,
+  .bob,
+  .tail,
+  .legs,
+  .leg,
+  .eye {
+    transform-box: fill-box;
+  }
+
   .torso,
   .head,
   .bob,
@@ -133,25 +152,47 @@
     transition: transform 0.45s cubic-bezier(0.3, 0.8, 0.4, 1);
   }
 
-  /* Lying and sleeping: the whole cat settles and widens slightly. */
+  /* Pivot points: a cat squashes down onto its feet, not around its middle. */
+  .torso {
+    transform-origin: 50% 100%;
+  }
+
+  .tail {
+    /* The tail's root — the end that meets the hip — is its bottom-left corner. */
+    transform-origin: 0% 100%;
+  }
+
+  .legs {
+    transform-origin: 50% 0%;
+  }
+
+  .leg {
+    transform-origin: 50% 0%;
+  }
+
+  .eye {
+    transform-origin: 50% 50%;
+  }
+
+  /* Lying and sleeping: the cat settles onto its feet and spreads a little. */
   .cat.lie .torso,
   .cat.sleep .torso {
-    transform: translateY(13px) scaleY(0.56) scaleX(1.16);
+    transform: scaleY(0.5) scaleX(1.2);
   }
 
   .cat.lie .head,
   .cat.sleep .head {
-    transform: translateY(20px) translateX(-3px);
+    transform: translate(-4px, 22px);
   }
 
   .cat.lie .legs,
   .cat.sleep .legs {
-    transform: translateY(6px) scaleY(0.25);
+    transform: translateY(9px) scaleY(0.2);
   }
 
   .cat.lie .tail,
   .cat.sleep .tail {
-    transform: translateY(11px) rotate(38deg);
+    transform: translateY(12px) rotate(46deg);
   }
 
   /* Walking and running lean the body into the direction of travel. */
@@ -169,7 +210,6 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .tail {
-      transform-origin: 11px -8px;
       animation: cat-tail-idle 3.6s ease-in-out infinite;
       animation-delay: var(--phase);
     }
@@ -188,20 +228,17 @@
     }
 
     .eye {
-      transform-origin: center;
       animation: cat-blink-eye 7s ease-in-out infinite;
       animation-delay: var(--phase);
     }
 
     .cat.walk .leg-front,
     .cat.run .leg-front {
-      transform-origin: 5px -12px;
       animation: cat-step 0.42s ease-in-out infinite;
     }
 
     .cat.walk .leg-back,
     .cat.run .leg-back {
-      transform-origin: -6px -12px;
       animation: cat-step 0.42s ease-in-out infinite reverse;
     }
 
@@ -253,12 +290,13 @@
 
   @keyframes cat-breathe {
     0%, 100% { transform: scaleY(1); }
-    50% { transform: scaleY(1.03); }
+    50% { transform: scaleY(1.035); }
   }
 
+  /* Must restate the lie pose: an animation on .torso overrides the class rule. */
   @keyframes cat-sleep-breathe {
-    0%, 100% { transform: translateY(13px) scaleY(0.56) scaleX(1.16); }
-    50% { transform: translateY(13px) scaleY(0.6) scaleX(1.18); }
+    0%, 100% { transform: scaleY(0.5) scaleX(1.2); }
+    50% { transform: scaleY(0.54) scaleX(1.22); }
   }
 
   @keyframes cat-blink-eye {

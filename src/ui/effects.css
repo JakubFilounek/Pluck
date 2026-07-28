@@ -14,11 +14,6 @@
   to { background-position: 44px 44px, 44px 44px; }
 }
 
-@keyframes scanline-sweep {
-  from { transform: translateY(-110%); }
-  to { transform: translateY(1100%); }
-}
-
 @keyframes caret-blink {
   0%, 45% { opacity: 1; }
   50%, 95% { opacity: 0; }
@@ -103,15 +98,8 @@
   mask-image: radial-gradient(ellipse at 50% 0%, #000 10%, transparent 78%);
 }
 
-:root[data-person='a'] .backdrop::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 42px;
-  background: linear-gradient(180deg, transparent, var(--accent-ghost), transparent);
-  opacity: 0.5;
-}
+/* A sweeping scanline used to live here. Removed: on a full-height page it read as
+   a stray line crawling down the screen rather than as atmosphere. */
 
 /* Person B: a warm wash the pastel palette sits on. Paw prints are separate nodes. */
 :root[data-person='b'] .backdrop::before {
@@ -133,10 +121,6 @@
 @media (prefers-reduced-motion: no-preference) {
   :root[data-person='a'] .backdrop::before {
     animation: grid-drift 14s linear infinite;
-  }
-
-  :root[data-person='a'] .backdrop::after {
-    animation: scanline-sweep 9s linear infinite;
   }
 
   .paw {
@@ -284,8 +268,7 @@ body {
     transform: none;
   }
 
-  .paw,
-  :root[data-person='a'] .backdrop::after {
+  .paw {
     display: none;
   }
 }
