@@ -3,8 +3,8 @@
     "pluck@slyjacobthebeast.dev": {
       "updates": [
         {
-          "version": "1.1.0",
-          "update_link": "https://github.com/JakubFilounek/Pluck/releases/download/v1.1.0/940f8208e1bf499193da-1.1.0.xpi",
+          "version": "1.2.0",
+          "update_link": "https://github.com/JakubFilounek/Pluck/releases/download/v1.2.0/940f8208e1bf499193da-1.2.0.xpi",
           "applications": {
             "gecko": {
               "strict_min_version": "121.0"

@@ -47,7 +47,7 @@ export function validateCredentials({ key, secret }) {
   } else if (SECRET.test(key)) {
     problems.push(
       'WEB_EXT_API_KEY holds a long hex string — that is the SECRET.\n' +
-        '    It wants the JWT issuer, which looks like "user:19614329:531".\n' +
+        '    It wants the JWT issuer, which looks like "user:12345678:123".\n' +
         '    (Mozilla calls the issuer the "API key", which is where this goes wrong.)',
     );
   } else if (!ISSUER.test(key)) {
