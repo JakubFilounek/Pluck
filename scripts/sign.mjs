@@ -28,31 +28,42 @@ if (problems.length > 0) {
 console.log('AMO credentials look well-formed.');
 if (checkOnly) process.exit(0);
 
-/** Local .bin binaries need the .cmd wrapper on Windows. */
-function bin(name) {
-  const suffix = process.platform === 'win32' ? '.cmd' : '';
-  return join(root, 'node_modules', '.bin', `${name}${suffix}`);
-}
+/**
+ * Each tool's JS entry point, run under this same node.
+ *
+ * Not node_modules/.bin: those are .cmd shims on Windows, which need a shell to
+ * invoke, and a shell re-splits the command on whitespace — so any checkout whose
+ * path contains a space (this one: "Browser extensions") breaks. Calling the entry
+ * script directly needs no shell and therefore no quoting.
+ */
+const ENTRY = {
+  wxt: join(root, 'node_modules', 'wxt', 'bin', 'wxt.mjs'),
+  'web-ext': join(root, 'node_modules', 'web-ext', 'bin', 'web-ext.js'),
+};
 
-function run(command, args, extraEnv = {}) {
-  const result = spawnSync(command, args, {
+function run(label, script, args, extraEnv = {}) {
+  const result = spawnSync(process.execPath, [script, ...args], {
     cwd: root,
     stdio: 'inherit',
     env: { ...process.env, ...extraEnv },
-    // .cmd wrappers are not executables, so Windows needs a shell to invoke them.
-    shell: process.platform === 'win32',
   });
 
+  if (result.error) {
+    console.error(`\nCould not start ${label}: ${result.error.message}`);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
-    console.error(`\nStep failed: ${command} ${args.join(' ')}`);
+    console.error(`\nStep failed: ${label}`);
     process.exit(result.status ?? 1);
   }
 }
 
-run(bin('wxt'), ['zip', '--browser', 'firefox']);
+run('wxt zip', ENTRY.wxt, ['zip', '--browser', 'firefox']);
 
 run(
-  bin('web-ext'),
+  'web-ext sign',
+  ENTRY['web-ext'],
   [
     'sign',
     '--source-dir',
@@ -67,4 +78,4 @@ run(
   { WEB_EXT_API_KEY: credentials.key, WEB_EXT_API_SECRET: credentials.secret },
 );
 
-run(process.execPath, [join(root, 'scripts', 'make-update-manifest.mjs')]);
+run('update manifest', join(root, 'scripts', 'make-update-manifest.mjs'), []);
