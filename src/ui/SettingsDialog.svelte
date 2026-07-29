@@ -15,10 +15,11 @@
   type Props = {
     settings: Settings;
     onclose: () => void;
-    onchange: () => void;
+    /** Data imports change IndexedDB and therefore need a dashboard refresh. */
+    ondatachange: () => void;
   };
 
-  let { settings, onclose, onchange }: Props = $props();
+  let { settings, onclose, ondatachange }: Props = $props();
 
   // Edit buffer for the name fields. The dialog is mounted fresh each time it opens,
   // so seeding once is correct — and not tracking the prop stops a save round-trip
@@ -27,11 +28,17 @@
   let names = $state({ ...settings.personNames });
   let importMessage = $state('');
   let importError = $state('');
+  let saveError = $state('');
   let fileInput = $state<HTMLInputElement | null>(null);
 
   async function patch(update: Partial<Settings>) {
-    await saveSettings(update);
-    onchange();
+    saveError = '';
+
+    try {
+      await saveSettings(update);
+    } catch (error) {
+      saveError = error instanceof Error ? error.message : 'Nastavení se nepodařilo uložit.';
+    }
   }
 
   async function handleImport(event: Event) {
@@ -44,7 +51,7 @@
     try {
       const result: ImportResult = await importBackup(await file.text());
       importMessage = `Přidáno ${result.itemsAdded} položek (${result.itemsSkipped} už tu bylo), ${result.listsAdded} seznamů, ${result.categoriesAdded} kategorií, ${result.tagsAdded} štítků.`;
-      onchange();
+      ondatachange();
     } catch (error) {
       importError = error instanceof Error ? error.message : 'Import se nezdařil.';
     } finally {
@@ -53,12 +60,12 @@
   }
 </script>
 
+<svelte:window onkeydown={(event) => event.key === 'Escape' && onclose()} />
+
 <div
-  class="backdrop"
-  role="button"
-  tabindex="-1"
+  class="dialog-backdrop"
+  role="presentation"
   onclick={onclose}
-  onkeydown={(event) => event.key === 'Escape' && onclose()}
 >
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
   <div
@@ -76,6 +83,7 @@
     </header>
 
     <div class="scroll stack">
+      {#if saveError}<p class="err" role="alert">{saveError}</p>{/if}
       <section>
         <h3>Kdo to používá</h3>
         <div class="two">
@@ -85,7 +93,7 @@
               <input
                 id="name-{person}"
                 bind:value={names[person]}
-                onblur={() => patch({ personNames: names })}
+                onblur={() => patch({ personNames: { ...names } })}
               />
             </div>
           {/each}
@@ -173,7 +181,7 @@
 </div>
 
 <style>
-  .backdrop {
+  .dialog-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
@@ -183,6 +191,7 @@
     z-index: 20;
     padding: 20px;
     border: none;
+    pointer-events: auto;
   }
 
   .panel {

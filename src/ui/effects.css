@@ -70,7 +70,7 @@
 
 /* --------------------------------------------------------- Animated backdrop */
 
-.backdrop {
+.theme-backdrop {
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -79,7 +79,7 @@
 }
 
 /* Person A: a slowly drifting technical grid plus a periodic scanline. */
-:root[data-person='a'] .backdrop::before {
+:root[data-person='a'] .theme-backdrop::before {
   content: '';
   position: absolute;
   inset: -60px;
@@ -95,7 +95,7 @@
    a stray line crawling down the screen rather than as atmosphere. */
 
 /* Person B: a warm wash the pastel palette sits on. Paw prints are separate nodes. */
-:root[data-person='b'] .backdrop::before {
+:root[data-person='b'] .theme-backdrop::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -112,7 +112,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-person='a'] .backdrop::before {
+  :root[data-person='a'] .theme-backdrop::before {
     animation: grid-drift 14s linear infinite;
   }
 
@@ -152,6 +152,13 @@
   .star.filled {
     animation: star-burst 0.32s ease-out;
   }
+}
+
+/* Never let person B's decoration survive a switch to person A, even for a frame
+   while Svelte and storage listeners settle. This is also a defensive fallback if
+   an old ThemeBackdrop node is ever left behind by a browser rendering bug. */
+:root[data-person='a'] .paw {
+  display: none;
 }
 
 /* ------------------------------------------------------------- Interaction */

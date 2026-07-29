@@ -126,6 +126,17 @@
     // Repaint immediately: the whole palette and motif follow the active person.
     cleanupTheme();
     cleanupTheme = applyAppearance(settings.theme, person);
+
+    // Lists and duplicate visibility are person-specific. Keeping the previous
+    // person's rows here could expose a private list or a surprise after switching.
+    lists = await listLists(person);
+    const visibleIds = new Set(lists.map((entry) => entry.id));
+    selectedLists = selectedLists.filter((id) => visibleIds.has(id));
+    if (selectedLists.length === 0) {
+      const fallback = lists.find((entry) => entry.id === DEFAULT_LIST_ID) ?? lists[0];
+      selectedLists = fallback ? [fallback.id] : [];
+    }
+    await refreshExisting();
   }
 
   function toggleTag(tagId: string) {

@@ -80,6 +80,7 @@
 
   let cleanupTheme = () => {};
   let cleanupSettings = () => {};
+  let refreshVersion = 0;
 
   $effect(() => {
     void boot();
@@ -98,11 +99,13 @@
     // The person toggle can be flipped from the popup, and both surprise mode and the
     // whole palette depend on it — so the dashboard follows the setting rather than
     // caching its own copy.
-    cleanupSettings = watchSettings(async (next) => {
+    cleanupSettings = watchSettings((next) => {
+      // storage.onChanged may fire before or after saveSettings resolves locally.
+      // Only this listener owns the settings update, so one change means one refresh.
       settings = next;
       cleanupTheme();
       cleanupTheme = applyAppearance(next.theme, next.activePerson);
-      await refresh();
+      void refresh();
     });
 
     await refresh();
@@ -111,9 +114,10 @@
   async function refresh() {
     if (!settings) return;
 
+    const version = ++refreshVersion;
     const ctx = { viewer: settings.activePerson, surpriseMode: settings.surpriseMode };
 
-    [items, categories, tags, sites, usage, lists, listCounts] = await Promise.all([
+    const result = await Promise.all([
       queryItems(ctx, filters, sort),
       listCategories(),
       listTags(),
@@ -122,6 +126,11 @@
       listLists(settings.activePerson),
       listUsage(ctx),
     ]);
+
+    // A person/filter change can start a newer refresh while IndexedDB is still
+    // answering this one. Never let an older result repaint the new person's UI.
+    if (version !== refreshVersion) return;
+    [items, categories, tags, sites, usage, lists, listCounts] = result;
 
     // Drop any list filter pointing at a list this person can no longer see — for
     // instance after switching person with a private list selected.
@@ -147,10 +156,7 @@
   }
 
   async function switchPerson(person: PersonId) {
-    settings = await saveSettings({ activePerson: person });
-    cleanupTheme();
-    cleanupTheme = applyAppearance(settings.theme, person);
-    await refresh();
+    await saveSettings({ activePerson: person });
   }
 
   async function setViewMode(viewMode: Settings['viewMode']) {
@@ -712,13 +718,15 @@
 
         {#if items.length === 0}
           <div class="empty">
-            <div class="empty-art">
-              {#if settings.activePerson === 'a'}
-                <TechScene width={340} />
-              {:else}
-                <CatScene width={360} />
-              {/if}
-            </div>
+            {#key settings.activePerson}
+              <div class="empty-art" data-person-art={settings.activePerson}>
+                {#if settings.activePerson === 'a'}
+                  <TechScene width={340} />
+                {:else}
+                  <CatScene width={360} />
+                {/if}
+              </div>
+            {/key}
             {#if totalCount === 0}
               <h2>Zatím tu nic není</h2>
               <p class="muted">
@@ -815,10 +823,7 @@
     <SettingsDialog
       {settings}
       onclose={() => (showSettings = false)}
-      onchange={async () => {
-        settings = await loadSettings();
-        await refresh();
-      }}
+      ondatachange={refresh}
     />
   {/if}
 {/if}
@@ -906,6 +911,12 @@
     display: flex;
     justify-content: center;
     margin-bottom: 6px;
+  }
+
+  /* A hard visual invariant: cat art can never appear in person A's blue theme,
+     including during an interrupted or delayed component update. */
+  :global(:root[data-person='a']) .empty-art[data-person-art='b'] {
+    display: none;
   }
 
   .count {

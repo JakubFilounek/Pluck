@@ -23,7 +23,7 @@
   ];
 </script>
 
-<div class="backdrop" aria-hidden="true">
+<div class="theme-backdrop" aria-hidden="true">
   {#if person === 'b'}
     {#each paws as paw, index (index)}
       <svg

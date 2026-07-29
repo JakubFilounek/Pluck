@@ -1,6 +1,7 @@
 # Pluck — what it is, and what is wrong with it
 
-Written 29 July 2026, against **v1.6.0**.
+Written 29 July 2026, against **v1.6.0**. Updated later that day with the
+post-handoff fixes currently in the working tree (not yet released).
 
 This document is for picking the project back up later, or handing it to someone
 else. It says what the extension is, how it is built, what works, and — at length,
@@ -93,7 +94,7 @@ launch and a new tab does not see a freshly set variable.
 All four are reported against **1.6.0, confirmed installed and active**. None of them
 are stale-build problems.
 
-### 3.1 Switching person leaves the other person's cats on screen — UNRESOLVED
+### 3.1 Switching person leaves the other person's cats on screen — FIXED, RELEASE PENDING
 
 **Symptom.** Switching Me → Her → Me leaves the cats visible on the blue/tech theme.
 Reported as "her dashboard glitches mine".
@@ -111,23 +112,19 @@ Reported as "her dashboard glitches mine".
    an element which must be actively dismissed can always fail to be dismissed. It was
    replaced by a 3px bar whose resting state is invisible and which nothing removes.
 
-**It survived the removal of the mechanism I believed was causing it.** That is the
-important fact: whatever is putting cats on screen is not the transition overlay.
+**Failure modes and fix.** Person-dependent refreshes could overlap, allowing an older
+IndexedDB response to repaint after a newer switch. Refreshes now carry a generation
+number and stale results are discarded. The empty-state scene is keyed by person so
+the previous component and its animation timers are destroyed, and person A has a
+CSS invariant that hides any stale cat art or paw nodes even during an interrupted
+render. The popup now also reloads person-private lists and duplicate visibility when
+its person toggle changes; previously it only repainted the palette.
 
-**Remaining suspects, none verified:**
+The source now compiles, all tests pass, and the Firefox production build succeeds.
+The final check is installing the next signed build over 1.6.0 and repeating the
+switch on the real profile.
 
-- The dashboard's empty-state art (`{#if activePerson === 'a'} TechScene {:else}
-  CatScene`) not re-evaluating — which would mean `settings.activePerson` is not
-  updating in that component, even though the palette does change.
-- `ThemeBackdrop` and its paw prints persisting.
-- Two dashboard tabs open at once, one stale.
-
-**To make progress:** open the dashboard, press F12 → Console, switch person, and
-report any errors plus whether the *palette* changes while the cats persist. If the
-palette switches to blue and cats remain, it is the empty-state conditional. If the
-whole page stays pink, `settings` is not propagating at all — a different bug.
-
-### 3.2 Opening settings freezes the dashboard — UNRESOLVED
+### 3.2 Opening settings freezes the dashboard — FIXED, RELEASE PENDING
 
 **Symptom.** Opening the settings dialog makes the dashboard unusable; it needs a
 reload.
@@ -137,14 +134,14 @@ its content grew the dialog instead of scrolling — and `f0428bf` cut the dialo
 to preferences only, removing the effect that recounted missing defaults on every prop
 change. Neither addressed a *freeze*, and the freeze is still reported.
 
-**Assessment.** A freeze rather than a visual glitch suggests an infinite loop or an
-unhandled rejection in a reactive cycle. A plausible shape: `saveSettings` → storage
-change → `watchSettings` → `refresh()` → something that writes settings again. I have
-not found such a cycle by reading, and cannot reproduce it without running it.
-
-**To make progress:** F12 → Console before opening settings. A loop usually announces
-itself as a repeated log line, a "too much recursion" error, or a tab that pegs a CPU
-core.
+**Root cause and fix.** The decorative page layer and the modal were both named
+`.backdrop`. Shared CSS sets the decorative layer to `pointer-events: none`, and that
+also matched the settings overlay. The dialog appeared but none of its controls could
+receive a click, which looked exactly like a frozen dashboard. They now use separate
+`theme-backdrop` and `dialog-backdrop` classes, and the latter explicitly accepts
+pointer events. Settings saves no longer launch a second redundant refresh, Escape
+closes the dialog reliably, errors are shown, and edited person names are copied out
+of Svelte's proxy before being sent to Firefox storage.
 
 ### 3.3 Adding a product produced an error — NEEDS THE ERROR TEXT
 
@@ -160,12 +157,24 @@ in-memory IndexedDB, including the exact argument shape the popup sends, with
 
 **To make progress:** the literal text of the message. It names the failing operation.
 
+The popup person switch was additionally fixed to reload private lists and surprise
+visibility before a save, preventing the form from retaining a list belonging to the
+other person. The underlying write-path tests still pass. A distinct add failure
+cannot honestly be diagnosed further without the error text from the installed build.
+
 ### 3.4 Delete controls on chips — ADDRESSED, UNVERIFIED
 
 Asked for: the × inside the capsule, visible only on hover. Done in the commit that
 accompanies this document, width-animated so the capsule grows to make room — a
 compromise, because the *first* version was inside-and-hover-only and its 14px target
 half outside the chip was unclickable, which is what "clicking X does nothing" meant.
+
+### 3.5 Cat art stretches between poses — FIXED, RELEASE PENDING
+
+The old sleeping pose compressed a standing torso to 50% height, widened it to 120%,
+and crushed the legs to 20%. That was deliberate CSS but visibly looked broken. Lying
+and sleeping cats now have their own curled silhouette. Movement, tail, blink and
+breathing animation use translation/rotation only; the body is never distorted.
 
 ---
 
