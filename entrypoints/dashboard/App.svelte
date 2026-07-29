@@ -1044,46 +1044,63 @@
     border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   }
 
-  /* The delete control sits inline rather than floating over the chip's corner.
-     Absolutely positioned and hover-only, it was a 14px target half outside its
-     parent — easy to miss entirely, which read as "clicking X does nothing". */
+  /*
+   * The delete control lives inside the capsule and only appears on hover.
+   *
+   * It is width-animated rather than opacity-toggled: an earlier version was
+   * absolutely positioned half outside the chip at 14px, which was easy to miss
+   * entirely and read as "clicking X does nothing". Here the capsule itself grows
+   * to make room, so the target is always fully inside a shape you are already
+   * pointing at.
+   */
   .pill-wrap {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    border-radius: 999px;
   }
 
   .pill-x {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
+    /* Collapsed to nothing until the capsule is hovered or focused within. */
+    width: 0;
     height: 18px;
-    padding: 0 3px;
-    border-radius: 5px;
+    padding: 0;
+    margin-left: -4px;
+    overflow: hidden;
+    border: none;
     background: transparent;
-    border: 1px solid transparent;
     color: var(--text-dim);
     font-size: 10px;
-    opacity: 0.55;
-    transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
+    opacity: 0;
+    transition:
+      width 0.14s ease,
+      opacity 0.14s ease,
+      margin 0.14s ease,
+      color 0.12s ease;
   }
 
   .pill-wrap:hover .pill-x,
+  .pill-wrap:focus-within .pill-x,
+  .pill-wrap.confirming .pill-x {
+    width: 18px;
+    margin-left: 0;
+    margin-right: 4px;
+    opacity: 0.75;
+  }
+
+  .pill-x:hover,
   .pill-x:focus-visible {
     opacity: 1;
-  }
-
-  .pill-x:hover {
     color: var(--danger);
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
   }
 
-  .pill-x.confirm {
+  .pill-wrap.confirming .pill-x.confirm {
+    width: auto;
+    padding: 0 7px;
     opacity: 1;
-    padding: 0 6px;
     color: var(--danger);
-    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
     font-weight: 600;
   }
 
