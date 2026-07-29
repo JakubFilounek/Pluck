@@ -14,6 +14,28 @@ import type {
 
 /** All writes go through here so timestamps and invariants stay in one place. */
 
+/**
+ * IndexedDB uses the structured-clone algorithm, which rejects Svelte's reactive
+ * Proxy objects. UI state can legitimately reach this boundary as a proxied array
+ * or nested object, so materialise arrays and plain records before every item write.
+ */
+function plainForStorage<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((entry) => plainForStorage(entry)) as T;
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype === Object.prototype || prototype === null) {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [key, plainForStorage(entry)]),
+      ) as T;
+    }
+  }
+
+  return value;
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -60,14 +82,15 @@ export async function createItem(input: NewItemInput): Promise<Item> {
     updatedAt: timestamp,
   };
 
-  await db.items.add(item);
-  return item;
+  const storedItem = plainForStorage(item);
+  await db.items.add(storedItem);
+  return storedItem;
 }
 
 type ItemPatch = Partial<Omit<Item, 'id' | 'createdAt' | 'updatedAt'>>;
 
 export async function updateItem(id: string, patch: ItemPatch): Promise<void> {
-  await db.items.update(id, { ...patch, updatedAt: now() });
+  await db.items.update(id, plainForStorage({ ...patch, updatedAt: now() }));
 }
 
 export async function setWant(

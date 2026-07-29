@@ -60,6 +60,27 @@ describe('createItem', () => {
     expect(await db.items.get(item.id)).toBeTruthy();
   });
 
+  it('materialises reactive Proxy values before writing to IndexedDB', async () => {
+    // Svelte 5 wraps component arrays and nested records in Proxy objects. Native
+    // IndexedDB rejects those with DataCloneError unless the data boundary removes
+    // the proxies first.
+    const reactiveTags = new Proxy(['tag-christmas'], {});
+    const reactiveLists = new Proxy(['list-nas-seznam'], {});
+    const reactivePrice = new Proxy({ amount: 999, currency: 'CZK', raw: '999 Kč' }, {});
+
+    const item = await createItem({
+      candidate: { ...CANDIDATE, price: reactivePrice },
+      addedBy: 'a',
+      tagIds: reactiveTags,
+      listIds: reactiveLists,
+    });
+
+    const stored = await db.items.get(item.id);
+    expect(stored?.tagIds).toEqual(['tag-christmas']);
+    expect(stored?.listIds).toEqual(['list-nas-seznam']);
+    expect(stored?.price).toEqual({ amount: 999, currency: 'CZK', raw: '999 Kč' });
+  });
+
   it('records the rating against the person who added it', async () => {
     const item = await createItem({ candidate: CANDIDATE, addedBy: 'b', want: 4 });
 

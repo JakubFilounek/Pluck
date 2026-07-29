@@ -143,9 +143,9 @@ pointer events. Settings saves no longer launch a second redundant refresh, Esca
 closes the dialog reliably, errors are shown, and edited person names are copied out
 of Svelte's proxy before being sent to Firefox storage.
 
-### 3.3 Adding a product produced an error — NEEDS THE ERROR TEXT
+### 3.3 Adding a product produced DataCloneError — FIXED IN 1.6.2
 
-**Symptom.** Reported as an error when adding a product; text not captured.
+**Symptom.** `Could not add it — DataCloneError: Proxy object could not be cloned.`
 
 **Status.** This is arguably progress. Until `64b1620`, `save()` awaited `createItem`
 with no `catch`, so a failure left the popup untouched and the button looked dead —
@@ -155,12 +155,15 @@ which is exactly what was reported earlier. It now prints what went wrong.
 in-memory IndexedDB, including the exact argument shape the popup sends, with
 `undefined` in every optional field. All pass.
 
-**To make progress:** the literal text of the message. It names the failing operation.
+**Root cause and fix.** Svelte 5 wraps reactive arrays and nested objects in Proxy
+objects. The popup passed its selected tag and list arrays directly to `createItem`,
+and native IndexedDB's structured-clone algorithm refuses Proxy values. All item
+creates and updates now recursively materialise arrays and plain records at the data
+boundary before Dexie writes them. A regression test sends real Proxy-wrapped tags,
+lists and price data through the full Dexie stack.
 
-The popup person switch was additionally fixed to reload private lists and surprise
-visibility before a save, preventing the form from retaining a list belonging to the
-other person. The underlying write-path tests still pass. A distinct add failure
-cannot honestly be diagnosed further without the error text from the installed build.
+The popup person switch also reloads private lists and surprise visibility before a
+save, preventing the form from retaining a list belonging to the other person.
 
 ### 3.4 Delete controls on chips — ADDRESSED, UNVERIFIED
 
