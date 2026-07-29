@@ -51,7 +51,6 @@
   import Icon from '@/src/ui/Icon.svelte';
   import TechScene from '@/src/ui/TechScene.svelte';
   import ThemeBackdrop from '@/src/ui/ThemeBackdrop.svelte';
-  import ThemeTransition from '@/src/ui/ThemeTransition.svelte';
   import { applyAppearance } from '@/src/ui/theme';
 
   let settings = $state<Settings | null>(null);
@@ -299,9 +298,23 @@
 
 {#if settings}
   <ThemeBackdrop person={settings.activePerson} />
-  <ThemeTransition person={settings.activePerson} />
-
   <div class="shell">
+    <!--
+      Person-switch feedback.
+
+      This replaces a full-screen wipe that got stranded three separate times,
+      each time covering the entire UI until a reload. The failure kept coming
+      from the same place: an element whose removal depended on a timer or an
+      event firing, so anything that interrupted the lifecycle left it up.
+
+      There is no lifecycle here. The bar is always in the DOM, its resting state
+      is scaleX(0) — invisible — and the {#key} restarts a one-shot animation when
+      the person changes. Nothing has to be cleaned up, and the worst case if the
+      animation never runs is a 3px line that isn't drawn at all.
+    -->
+    {#key settings.activePerson}
+      <div class="switch-bar" aria-hidden="true"></div>
+    {/key}
     <header class="topbar">
       <div class="row">
         <span class="mark">
@@ -818,6 +831,44 @@
     /* Above the fixed decorative backdrop. */
     position: relative;
     z-index: 1;
+  }
+
+  .switch-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 30;
+    pointer-events: none;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent));
+    /* Resting state is invisible, so a missing animation shows nothing at all. */
+    transform: scaleX(0);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .switch-bar {
+      animation: switch-sweep 0.75s cubic-bezier(0.65, 0, 0.35, 1);
+    }
+  }
+
+  @keyframes switch-sweep {
+    0% {
+      transform: scaleX(0);
+      transform-origin: left;
+    }
+    55% {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+    56% {
+      transform: scaleX(1);
+      transform-origin: right;
+    }
+    100% {
+      transform: scaleX(0);
+      transform-origin: right;
+    }
   }
 
   .topbar {

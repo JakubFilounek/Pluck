@@ -2,7 +2,7 @@
   "name": "pluck",
   "description": "A local wishlist and favourites extension for two people sharing one Firefox profile.",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.6.0",
   "type": "module",
   "scripts": {
     "dev": "wxt --browser firefox",

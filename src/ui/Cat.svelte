@@ -2,21 +2,18 @@
   import type { CatPose } from './catScene';
 
   /**
-   * One cat, in side profile, drawn in local coordinates where (0, 0) is the point
-   * its feet touch the floor and it faces +x.
+   * One cat, drawn in local coordinates where (0, 0) is the point its feet touch the
+   * floor. Everything above the floor is negative Y, so a cat can be placed by simply
+   * translating to a spot on the ground line.
    *
-   * Profile rather than front-on: these cats travel horizontally, and a front-facing
-   * cat sliding sideways can never read as walking however its legs are animated.
-   * In profile a four-leg gait works, which is what makes movement look like movement.
-   *
-   * Poses are built from rotations and translations of separate parts — never by
-   * scaling the body, which is what previously squashed them across the floor.
+   * Poses are CSS transforms on named groups rather than alternative path sets — the
+   * silhouette stays consistent and pose changes can tween.
    */
 
   type Props = {
     variant: 'black' | 'white';
     pose: CatPose;
-    /** Offsets each cat's idle timing so the two never move in lockstep. */
+    /** Distinguishes the two cats' animation phase so they never move in lockstep. */
     phase?: number;
   };
 
@@ -27,103 +24,119 @@
     variant === 'black' ? 'var(--cat-outline)' : 'var(--cat-white-outline)',
   );
   const eyeColor = $derived(variant === 'black' ? '#f7e07a' : '#8fd3e8');
-
   const asleep = $derived(pose === 'sleep');
-  const down = $derived(pose === 'lie' || pose === 'sleep');
-  const sitting = $derived(pose === 'sit' || pose === 'groom');
+  const moving = $derived(pose === 'walk' || pose === 'run');
 </script>
 
 <g class="cat {pose}" style="--phase: {phase}s">
-  <!-- Contact shadow, drawn first so the cat is always on top of it. -->
-  <ellipse class="shadow" cx="-2" cy="0" rx="17" ry="2.6" />
+  <!-- Contact shadow. Sits at the floor line and is drawn first, so the cat is always
+       on top of it — it used to be a wide ellipse that read as a puddle in front. -->
+  <ellipse class="shadow" cx="0" cy="0" rx="15" ry="3" />
 
-  <g class="frame">
-    <!-- Far legs first, in a darker tint, so the near pair reads in front. -->
-    <g class="legs far" stroke={coat} stroke-width="4.6" stroke-linecap="round">
-      <path class="leg leg-hind-far" d="M-12 -13 V-1" />
-      <path class="leg leg-fore-far" d="M8 -12 V-1" />
-    </g>
-
-    <!-- Tail, rooted at the hip. -->
+  <g class="bob">
+    <!-- Tail. Rooted at the hip so it visibly belongs to the body, and it never
+         reaches below the floor line. -->
     <path
       class="tail"
-      d="M-17 -19 C-25 -22 -27 -32 -21 -36"
+      d="M11 -8 C22 -11 25 -24 18 -30"
       stroke={coat}
-      stroke-width="4.4"
+      stroke-width="5"
       stroke-linecap="round"
       fill="none"
     />
 
-    <g class="body">
-      <!-- Torso: a single rounded form from haunch to shoulder. -->
+    <!-- Back legs stay planted; front legs carry the walk cycle. -->
+    <g class="legs" stroke={coat} stroke-width="5.5" stroke-linecap="round">
+      <path class="leg leg-back" d="M-6 -12 V-1" />
+      <path class="leg leg-front" d="M5 -12 V-1" />
+    </g>
+
+    <g class="torso">
       <path
-        d="M-18 -13 C-19 -24 -14 -28 -6 -28 H8 C15 -28 17 -23 16 -13 C15 -9 10 -8 4 -8 H-8 C-14 -8 -17.5 -9.5 -18 -13 Z"
+        class="body"
+        d="M-12 -1 C-13.5 -19 -10 -31 0 -31 C10 -31 13.5 -19 12 -1 Z"
         fill={coat}
         stroke={outline}
-        stroke-width="1.1"
+        stroke-width="1.2"
       />
 
-      {#if variant === 'white'}
-        <!-- The few black spots, on the torso so they travel with it. -->
-        <g fill="#2b1f28" opacity="0.9">
-          <ellipse cx="-8" cy="-19" rx="4.4" ry="3.4" />
-          <ellipse cx="4" cy="-13" rx="3" ry="2.3" />
-        </g>
-      {/if}
-
       <g class="head">
-        <circle cx="19" cy="-27" r="9.2" fill={coat} stroke={outline} stroke-width="1.1" />
-        <!-- Ears -->
-        <path d="M13 -33 L12.5 -41 L19.5 -35.5 Z" fill={coat} />
-        <path d="M22 -34.5 L25 -41.5 L27 -33 Z" fill={coat} />
-        <path d="M14.6 -34.3 L14.3 -38.6 L18 -35.6 Z" fill="#e59ac0" opacity="0.75" />
-        <path d="M23 -35 L24.6 -39 L25.6 -34 Z" fill="#e59ac0" opacity="0.75" />
-
-        {#if variant === 'white'}
-          <path d="M13 -33 L12.5 -41 L19.5 -35.5 Z" fill="#2b1f28" opacity="0.9" />
-        {/if}
-
-        <!-- Muzzle -->
-        <path d="M25 -25 q4 0.6 4.4 3" fill="none" stroke={coat} stroke-width="4.6" stroke-linecap="round" />
+        <circle cx="0" cy="-41" r="12.5" fill={coat} stroke={outline} stroke-width="1.2" />
+        <path d="M-11 -48 L-9.5 -59 L-2 -51 Z" fill={coat} />
+        <path d="M11 -48 L9.5 -59 L2 -51 Z" fill={coat} />
+        <path d="M-8.6 -50 L-7.9 -55.4 L-3.6 -50.9 Z" fill="#e59ac0" opacity="0.8" />
+        <path d="M8.6 -50 L7.9 -55.4 L3.6 -50.9 Z" fill="#e59ac0" opacity="0.8" />
 
         {#if asleep}
-          <path
-            d="M20 -28 q2.6 2.2 5.2 0"
-            stroke="#1a1218"
-            stroke-width="1.4"
-            stroke-linecap="round"
-            fill="none"
-          />
+          <!-- Closed eyes read as arcs; scaling an open eye to nothing just vanishes. -->
+          <g stroke="#1a1218" stroke-width="1.5" stroke-linecap="round" fill="none">
+            <path d="M-7.5 -42 q3 2.4 6 0" />
+            <path d="M1.5 -42 q3 2.4 6 0" />
+          </g>
         {:else}
-          <ellipse class="eye" cx="22.5" cy="-28.5" rx="2.4" ry="2.9" fill={eyeColor} />
-          <ellipse cx="23.2" cy="-28.5" rx="0.85" ry="2.5" fill="#1a1218" />
+          <g fill={eyeColor}>
+            <ellipse class="eye" cx="-4.5" cy="-42.5" rx="2.6" ry="3.2" />
+            <ellipse class="eye" cx="4.5" cy="-42.5" rx="2.6" ry="3.2" />
+          </g>
+          <g fill="#1a1218">
+            <ellipse cx="-4.5" cy="-42.5" rx="0.9" ry="2.8" />
+            <ellipse cx="4.5" cy="-42.5" rx="0.9" ry="2.8" />
+          </g>
         {/if}
 
-        <circle cx="29.6" cy="-22.6" r="1.2" fill="#e59ac0" />
+        <path
+          d="M-2 -36 L0 -34.2 L2 -36"
+          stroke="#e59ac0"
+          stroke-width="1.3"
+          stroke-linecap="round"
+          fill="none"
+        />
       </g>
     </g>
 
-    <!-- Near legs, drawn over the body. -->
-    <g class="legs near" stroke={coat} stroke-width="5" stroke-linecap="round">
-      <path class="leg leg-hind" d="M-13 -13 V-1" />
-      <path class="leg leg-fore" d="M9 -12 V-1" />
-    </g>
+    {#if variant === 'white'}
+      <!-- The few black spots. Placed on the torso and one ear so they move with it. -->
+      <g fill="#2b1f28" opacity="0.9" class="spots">
+        <ellipse cx="-6.5" cy="-14" rx="4.2" ry="3.2" />
+        <ellipse cx="6" cy="-6" rx="3.2" ry="2.4" />
+        <path d="M11 -48 L9.5 -59 L2 -51 Z" />
+      </g>
+    {/if}
   </g>
 
   {#if asleep}
     <g class="zzz" fill="currentColor" opacity="0.75">
-      <text x="30" y="-36" font-size="7.5" font-weight="700">z</text>
-      <text x="36" y="-43" font-size="6" font-weight="700">z</text>
+      <text x="14" y="-52" font-size="8" font-weight="700">z</text>
+      <text x="20" y="-60" font-size="6.5" font-weight="700">z</text>
     </g>
   {/if}
 </g>
 
 <style>
-  /* transform-box: fill-box throughout — a CSS transform-origin on an SVG element
-     otherwise resolves against the whole scene view-box, not the element. */
-  .frame,
-  .body,
+  .shadow {
+    fill: currentColor;
+    opacity: 0.14;
+    transition: rx 0.4s ease, opacity 0.4s ease;
+  }
+
+  .cat.lie .shadow,
+  .cat.sleep .shadow {
+    rx: 19;
+    opacity: 0.18;
+  }
+
+  /*
+   * transform-box: fill-box everywhere that transforms.
+   *
+   * CSS transform-origin on an SVG element resolves against the whole view-box by
+   * default, so `transform-origin: center` meant the centre of the 320x128 scene,
+   * roughly 150 units away from the part being scaled. The torso appeared to stretch
+   * across the floor and the eyes flew out of the head. fill-box makes each origin
+   * relative to that element's own bounding box, which is what every rule here wants.
+   */
+  .torso,
   .head,
+  .bob,
   .tail,
   .legs,
   .leg,
@@ -131,186 +144,128 @@
     transform-box: fill-box;
   }
 
-  .shadow {
-    fill: currentColor;
-    opacity: 0.15;
-    transition: rx 0.4s ease, opacity 0.4s ease;
-  }
-
-  .cat.lie .shadow,
-  .cat.sleep .shadow {
-    rx: 20;
-  }
-
-  .body,
+  .torso,
   .head,
+  .bob,
   .tail,
-  .legs,
-  .frame {
-    transition: transform 0.4s cubic-bezier(0.3, 0.85, 0.35, 1), opacity 0.3s ease;
+  .legs {
+    transition: transform 0.45s cubic-bezier(0.3, 0.8, 0.4, 1);
   }
 
-  /* Legs pivot at the shoulder/hip, i.e. the top of the stroke. */
-  .leg {
-    transform-origin: 50% 0%;
-    transition: transform 0.3s ease;
+  /* Pivot points: a cat squashes down onto its feet, not around its middle. */
+  .torso {
+    transform-origin: 50% 100%;
   }
 
   .tail {
-    transform-origin: 100% 100%;
+    /* The tail's root — the end that meets the hip — is its bottom-left corner. */
+    transform-origin: 0% 100%;
+  }
+
+  .legs {
+    transform-origin: 50% 0%;
+  }
+
+  .leg {
+    transform-origin: 50% 0%;
   }
 
   .eye {
     transform-origin: 50% 50%;
   }
 
-  /* Pivot the torso about its rear underside, so tipping it back lifts the chest
-     rather than driving the haunches through the floor. */
-  .body {
-    transform-origin: 12% 100%;
-  }
-
-  /*
-   * Sitting: rear on the ground, chest up, forelegs propping the front.
-   * A gentle tip plus shortened hind legs just read as a standing cat with stumpy
-   * back legs — the angle has to be decisive, and the hind legs fold away entirely.
-   */
-  .cat.sit .body,
-  .cat.groom .body {
-    transform: translateY(3px) rotate(-24deg);
-  }
-
-  .cat.sit .leg-hind,
-  .cat.sit .leg-hind-far,
-  .cat.groom .leg-hind,
-  .cat.groom .leg-hind-far {
-    opacity: 0;
-  }
-
-  .cat.sit .leg-fore,
-  .cat.sit .leg-fore-far,
-  .cat.groom .leg-fore,
-  .cat.groom .leg-fore-far {
-    transform: translate(4px, -4px);
-  }
-
-  .cat.sit .tail,
-  .cat.groom .tail {
-    transform: translateY(5px) rotate(24deg);
-  }
-
-  .cat.groom .head {
-    transform: translate(-5px, 9px) rotate(46deg);
-  }
-
-  /* Lying: everything settles onto the floor, legs tuck away under the body. */
-  .cat.lie .frame,
-  .cat.sleep .frame {
-    transform: translateY(9px);
-  }
-
-  .cat.lie .legs,
-  .cat.sleep .legs {
-    opacity: 0;
+  /* Lying and sleeping: the cat settles onto its feet and spreads a little. */
+  .cat.lie .torso,
+  .cat.sleep .torso {
+    transform: scaleY(0.5) scaleX(1.2);
   }
 
   .cat.lie .head,
   .cat.sleep .head {
-    transform: translate(-3px, 4px) rotate(6deg);
+    transform: translate(-4px, 22px);
+  }
+
+  .cat.lie .legs,
+  .cat.sleep .legs {
+    transform: translateY(9px) scaleY(0.2);
   }
 
   .cat.lie .tail,
   .cat.sleep .tail {
-    transform: translate(2px, 10px) rotate(58deg);
+    transform: translateY(12px) rotate(46deg);
   }
 
-  /* Moving: lean into the direction of travel. */
-  .cat.run .body {
-    transform: rotate(-5deg);
+  /* Walking and running lean the body into the direction of travel. */
+  .cat.walk .torso {
+    transform: rotate(-3deg);
+  }
+
+  .cat.run .torso {
+    transform: rotate(-9deg) translateY(2px);
+  }
+
+  .cat.groom .head {
+    transform: translateY(9px) rotate(-16deg);
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .tail {
-      animation: tail-sway 3.4s ease-in-out infinite;
+      animation: cat-tail-idle 3.6s ease-in-out infinite;
       animation-delay: var(--phase);
     }
 
-    .cat.walk .tail {
-      animation-duration: 1.2s;
-    }
-
     .cat.run .tail {
-      animation-duration: 0.42s;
+      animation-duration: 0.5s;
     }
 
-    .cat.lie .tail,
-    .cat.sleep .tail {
+    .cat.walk .tail {
+      animation-duration: 1.3s;
+    }
+
+    .cat.sleep .tail,
+    .cat.lie .tail {
       animation: none;
     }
 
     .eye {
-      animation: blink 6.5s ease-in-out infinite;
+      animation: cat-blink-eye 7s ease-in-out infinite;
       animation-delay: var(--phase);
     }
 
-    /*
-     * The gait. Four legs on the same keyframes at four different delays is what
-     * makes it read as walking rather than as two legs flapping: diagonal pairs
-     * move together, half a cycle apart.
-     */
-    .cat.walk .leg,
-    .cat.run .leg {
-      animation: step var(--gait, 0.5s) ease-in-out infinite;
+    .cat.walk .leg-front,
+    .cat.run .leg-front {
+      animation: cat-step 0.42s ease-in-out infinite;
     }
 
-    .cat.walk .leg-hind,
-    .cat.run .leg-hind {
-      animation-delay: 0s;
+    .cat.walk .leg-back,
+    .cat.run .leg-back {
+      animation: cat-step 0.42s ease-in-out infinite reverse;
     }
 
-    .cat.walk .leg-fore,
-    .cat.run .leg-fore {
-      animation-delay: calc(var(--gait, 0.5s) * -0.5);
+    .cat.run .leg-front,
+    .cat.run .leg-back {
+      animation-duration: 0.22s;
     }
 
-    .cat.walk .leg-hind-far,
-    .cat.run .leg-hind-far {
-      animation-delay: calc(var(--gait, 0.5s) * -0.5);
+    .cat.walk .bob {
+      animation: cat-bob 0.42s ease-in-out infinite;
     }
 
-    .cat.walk .leg-fore-far,
-    .cat.run .leg-fore-far {
-      animation-delay: 0s;
+    .cat.run .bob {
+      animation: cat-bob 0.22s ease-in-out infinite;
     }
 
-    .cat.walk {
-      --gait: 0.5s;
-    }
-
-    .cat.run {
-      --gait: 0.26s;
-    }
-
-    .cat.walk .frame {
-      animation: bob 0.25s ease-in-out infinite;
-    }
-
-    .cat.run .frame {
-      animation: bound 0.26s ease-in-out infinite;
-    }
-
-    .cat.sit .body,
-    .cat.groom .body {
-      animation: breathe-sit 4s ease-in-out infinite;
+    .cat.sit .torso {
+      animation: cat-breathe 4s ease-in-out infinite;
       animation-delay: var(--phase);
     }
 
-    .cat.sleep .body {
-      animation: breathe-lie 3.6s ease-in-out infinite;
+    .cat.sleep .torso {
+      animation: cat-sleep-breathe 3.4s ease-in-out infinite;
     }
 
     .zzz text {
-      animation: zzz 2.6s ease-out infinite;
+      animation: zzz-drift 2.6s ease-out infinite;
     }
 
     .zzz text:last-child {
@@ -318,45 +273,40 @@
     }
   }
 
-  @keyframes step {
-    0%, 100% { transform: rotate(-24deg); }
-    50% { transform: rotate(24deg); }
+  @keyframes cat-tail-idle {
+    0%, 100% { transform: rotate(-9deg); }
+    50% { transform: rotate(12deg); }
   }
 
-  @keyframes bob {
+  @keyframes cat-step {
+    0%, 100% { transform: rotate(-22deg); }
+    50% { transform: rotate(22deg); }
+  }
+
+  @keyframes cat-bob {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-1.2px); }
+    50% { transform: translateY(-1.6px); }
   }
 
-  @keyframes bound {
-    0%, 100% { transform: translateY(0); }
-    45% { transform: translateY(-3px); }
+  @keyframes cat-breathe {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.035); }
   }
 
-  @keyframes tail-sway {
-    0%, 100% { transform: rotate(-10deg); }
-    50% { transform: rotate(14deg); }
+  /* Must restate the lie pose: an animation on .torso overrides the class rule. */
+  @keyframes cat-sleep-breathe {
+    0%, 100% { transform: scaleY(0.5) scaleX(1.2); }
+    50% { transform: scaleY(0.54) scaleX(1.22); }
   }
 
-  @keyframes blink {
-    0%, 94%, 100% { transform: scaleY(1); }
-    97% { transform: scaleY(0.08); }
+  @keyframes cat-blink-eye {
+    0%, 93%, 100% { transform: scaleY(1); }
+    96% { transform: scaleY(0.1); }
   }
 
-  /* Restate the pose: an animation on .body overrides the class rule entirely. */
-  @keyframes breathe-sit {
-    0%, 100% { transform: translateY(3px) rotate(-24deg); }
-    50% { transform: translateY(2.4px) rotate(-25deg); }
-  }
-
-  @keyframes breathe-lie {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-0.8px); }
-  }
-
-  @keyframes zzz {
+  @keyframes zzz-drift {
     0% { transform: translate(0, 0); opacity: 0; }
     25% { opacity: 0.8; }
-    100% { transform: translate(6px, -13px); opacity: 0; }
+    100% { transform: translate(6px, -14px); opacity: 0; }
   }
 </style>
