@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { PersonId } from '../domain/types';
+  import CatScene from './CatScene.svelte';
+  import TechScene from './TechScene.svelte';
 
   /**
    * Fixed, non-interactive layer behind the whole UI. The grid, scanline and colour
@@ -24,7 +26,17 @@
 </script>
 
 <div class="theme-backdrop" aria-hidden="true">
+  {#if person === 'a'}
+    <div class="ambient-tech"><TechScene width={410} /></div>
+    <svg class="code-rail" viewBox="0 0 90 500" preserveAspectRatio="none">
+      <path class="rail-trace" d="M10 18h46v58h24v70H34v82h42v74H18v88h56v94" />
+      <circle class="rail-node n1" cx="56" cy="76" r="4" />
+      <circle class="rail-node n2" cx="34" cy="228" r="4" />
+      <circle class="rail-node n3" cx="18" cy="390" r="4" />
+    </svg>
+  {/if}
   {#if person === 'b'}
+    <div class="ambient-cats"><CatScene width={480} /></div>
     {#each paws as paw, index (index)}
       <svg
         class="paw"

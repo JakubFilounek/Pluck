@@ -41,9 +41,35 @@ export const DEFAULT_FILTERS: ItemFilters = {
   sites: [],
 };
 
+/** A fresh, structured-clone-safe filter value for UI state and async queries. */
+export function createDefaultFilters(): ItemFilters {
+  return {
+    ...DEFAULT_FILTERS,
+    statuses: [...DEFAULT_FILTERS.statuses],
+    categoryIds: [],
+    tagIds: [],
+    listIds: [],
+    sites: [],
+  };
+}
+
+/** Remove Svelte proxies and isolate an in-flight query from later UI changes. */
+export function snapshotFilters(filters: ItemFilters): ItemFilters {
+  return {
+    ...filters,
+    statuses: [...filters.statuses],
+    categoryIds: [...filters.categoryIds],
+    tagIds: [...filters.tagIds],
+    listIds: [...filters.listIds],
+    sites: [...filters.sites],
+  };
+}
+
 export function isDefaultFilters(filters: ItemFilters): boolean {
   return (
     filters.search === '' &&
+    filters.statuses.length === DEFAULT_FILTERS.statuses.length &&
+    filters.statuses.every((status) => DEFAULT_FILTERS.statuses.includes(status)) &&
     filters.categoryIds.length === 0 &&
     filters.tagIds.length === 0 &&
     filters.listIds.length === 0 &&

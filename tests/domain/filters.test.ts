@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FILTERS,
   combinedWant,
+  createDefaultFilters,
   filterItems,
   isHiddenFromViewer,
+  isDefaultFilters,
   matchesFilters,
+  snapshotFilters,
   totalWant,
 } from '@/src/domain/filters';
 import type { Item } from '@/src/domain/types';
@@ -90,6 +93,29 @@ describe('status filter', () => {
     const filters = { ...DEFAULT_FILTERS, statuses: [] };
 
     expect(matchesFilters(makeItem({ status: 'dropped' }), filters)).toBe(true);
+  });
+
+  it('shows a dropped item when that status is selected, including with every status checked', () => {
+    const dropped = makeItem({ status: 'dropped' });
+
+    expect(matchesFilters(dropped, { ...createDefaultFilters(), statuses: ['dropped'] })).toBe(true);
+    expect(
+      matchesFilters(dropped, {
+        ...createDefaultFilters(),
+        statuses: ['wanted', 'bought', 'dropped'],
+      }),
+    ).toBe(true);
+  });
+
+  it('counts a changed status selection as a real filter and creates clean reset values', () => {
+    const changed = createDefaultFilters();
+    changed.statuses = ['dropped'];
+    expect(isDefaultFilters(changed)).toBe(false);
+    expect(isDefaultFilters(createDefaultFilters())).toBe(true);
+
+    const snapshot = snapshotFilters(changed);
+    changed.statuses.push('wanted');
+    expect(snapshot.statuses).toEqual(['dropped']);
   });
 });
 

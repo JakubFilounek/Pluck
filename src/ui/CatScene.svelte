@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Cat from './Cat.svelte';
   import {
     nextPose,
@@ -113,9 +114,13 @@
       timers.add(timer);
     }
 
-    step('black');
-    step('white');
-    maybeChase();
+    // Startup reads and updates both reactive cat states. Without untracking,
+    // Svelte sees a self-updating effect and stops the whole dashboard.
+    untrack(() => {
+      step('black');
+      step('white');
+      maybeChase();
+    });
 
     return () => {
       for (const timer of timers) clearTimeout(timer);

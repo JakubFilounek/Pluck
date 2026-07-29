@@ -27,6 +27,20 @@
   to { transform: translateY(-130px) rotate(calc(var(--paw-tilt, 0deg) + 18deg)); opacity: 0; }
 }
 
+@keyframes ambient-drift {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(-24px) translateY(-5px); }
+}
+
+@keyframes rail-flow {
+  to { stroke-dashoffset: -42; }
+}
+
+@keyframes node-travel {
+  0%, 100% { opacity: 0.18; transform: scale(0.75); }
+  50% { opacity: 0.8; transform: scale(1.35); }
+}
+
 @keyframes tail-sway {
   0%, 100% { transform: rotate(-7deg); }
   50% { transform: rotate(9deg); }
@@ -111,10 +125,56 @@
   color: var(--accent);
 }
 
+.ambient-tech,
+.ambient-cats {
+  position: absolute;
+  right: 2vw;
+  bottom: 1vh;
+  color: var(--accent);
+  opacity: 0.2;
+  filter: drop-shadow(0 0 16px var(--glow));
+}
+
+.ambient-cats {
+  right: 5vw;
+  color: var(--text);
+  opacity: 0.34;
+}
+
+.code-rail {
+  position: absolute;
+  top: 15%;
+  right: 0;
+  width: 74px;
+  height: 62vh;
+  overflow: visible;
+  color: var(--accent);
+  opacity: 0.28;
+}
+
+.rail-trace {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-dasharray: 9 12;
+}
+
+.rail-node { fill: currentColor; transform-box: fill-box; transform-origin: center; }
+
 @media (prefers-reduced-motion: no-preference) {
   :root[data-person='a'] .theme-backdrop::before {
     animation: grid-drift 14s linear infinite;
   }
+
+  .ambient-tech,
+  .ambient-cats {
+    animation: ambient-drift 13s ease-in-out infinite;
+  }
+
+  .rail-trace { animation: rail-flow 3.4s linear infinite; }
+  .rail-node { animation: node-travel 2.8s ease-in-out infinite; }
+  .rail-node.n2 { animation-delay: -0.9s; }
+  .rail-node.n3 { animation-delay: -1.8s; }
 
   .paw {
     animation: paw-float var(--paw-duration, 14s) linear infinite;
@@ -228,4 +288,9 @@ body {
   .paw {
     display: none;
   }
+
+  .code-rail { display: none; }
+
+  .ambient-tech,
+  .ambient-cats { opacity: 0.16; }
 }

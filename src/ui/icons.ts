@@ -99,6 +99,10 @@ export const ICONS = {
   },
   close: { stroke: ['M6.2 6.2 17.8 17.8', 'M17.8 6.2 6.2 17.8'] },
   check: { stroke: ['M4.6 12.4 9.6 17.4 19.4 6.6'] },
+  checkCircle: { stroke: [circle(12, 12, 8.5), 'M7.6 12.2 10.6 15.2 16.8 8.8'] },
+  archive: { stroke: ['M4.2 7.5h15.6v12H4.2Z', 'M3 4.5h18v3H3Z', 'M9 11.2h6'] },
+  tag: { stroke: ['M3.8 12.2V5h7.2l9.2 9.2-6 6Z', circle(8.1, 9.1, 1.2)] },
+  collection: { stroke: ['M5 6.2h14v14H5Z', 'M3 17.8V4h13.8'] },
   settings: {
     stroke: ['M3.6 7.4h5.6', 'M13 7.4h7.4', 'M3.6 16.6h7.4', 'M15.2 16.6h5.2'],
     fill: [circle(11.1, 7.4, 2.1), circle(13.3, 16.6, 2.1)],

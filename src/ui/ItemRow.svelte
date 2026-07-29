@@ -80,12 +80,21 @@
   </div>
 
   <strong class="price">{formatPrice(item.price)}</strong>
+
+  <a
+    class="open-link"
+    href={item.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Otevřít {item.title} v novém panelu"
+    title="Otevřít původní produkt"
+  ><Icon name="external" size={16} weight={2} /><span>Otevřít</span></a>
 </div>
 
 <style>
   .row-item {
     display: grid;
-    grid-template-columns: auto 44px 1fr auto auto 90px;
+    grid-template-columns: auto 44px 1fr auto auto 90px auto;
     align-items: center;
     gap: 10px;
     padding: 7px 10px;
@@ -166,13 +175,35 @@
     font-size: 13px;
   }
 
+  .open-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 32px;
+    padding: 0 9px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 650;
+  }
+
+  .open-link:hover,
+  .open-link:focus-visible {
+    color: var(--accent-contrast);
+    background: var(--accent);
+  }
+
   @media (max-width: 900px) {
     .row-item {
-      grid-template-columns: auto 44px 1fr auto;
+      grid-template-columns: auto 44px 1fr auto auto;
     }
 
     .want-cell:last-of-type {
       display: none;
     }
+
+    .open-link span { display: none; }
   }
 </style>

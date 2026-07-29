@@ -1,7 +1,7 @@
 # Pluck — what it is, and what is wrong with it
 
-Written 29 July 2026, against **v1.6.0**. Updated later that day with the
-post-handoff fixes currently in the working tree (not yet released).
+Written 29 July 2026. Updated against **v1.6.3** after the dashboard interaction
+repair and rendered browser verification.
 
 This document is for picking the project back up later, or handing it to someone
 else. It says what the extension is, how it is built, what works, and — at length,
@@ -46,7 +46,7 @@ Firefox profile and the only copy that exists anywhere else is the JSON you expo
 | Storage | IndexedDB via Dexie (`pluck`, schema v2); preferences in `storage.local` |
 | Distribution | Signed by Mozilla as **unlisted**, self-hosted on GitHub |
 | Repo | `github.com/JakubFilounek/Pluck` — must stay **public** or updates break |
-| Tests | 129, via Vitest |
+| Tests | 136, via Vitest, plus rendered dashboard interaction checks |
 
 ### Layout
 
@@ -94,7 +94,7 @@ launch and a new tab does not see a freshly set variable.
 All four are reported against **1.6.0, confirmed installed and active**. None of them
 are stale-build problems.
 
-### 3.1 Switching person leaves the other person's cats on screen — FIXED, RELEASE PENDING
+### 3.1 Switching person leaves the other person's cats on screen — FIXED
 
 **Symptom.** Switching Me → Her → Me leaves the cats visible on the blue/tech theme.
 Reported as "her dashboard glitches mine".
@@ -124,7 +124,7 @@ The source now compiles, all tests pass, and the Firefox production build succee
 The final check is installing the next signed build over 1.6.0 and repeating the
 switch on the real profile.
 
-### 3.2 Opening settings freezes the dashboard — FIXED, RELEASE PENDING
+### 3.2 Opening settings freezes the dashboard — FIXED
 
 **Symptom.** Opening the settings dialog makes the dashboard unusable; it needs a
 reload.
@@ -165,19 +165,34 @@ lists and price data through the full Dexie stack.
 The popup person switch also reloads private lists and surprise visibility before a
 save, preventing the form from retaining a list belonging to the other person.
 
-### 3.4 Delete controls on chips — ADDRESSED, UNVERIFIED
+### 3.4 Delete controls on chips — FIXED IN 1.6.3
 
-Asked for: the × inside the capsule, visible only on hover. Done in the commit that
-accompanies this document, width-animated so the capsule grows to make room — a
-compromise, because the *first* version was inside-and-hover-only and its 14px target
-half outside the chip was unclickable, which is what "clicking X does nothing" meant.
+The delete control is absolutely positioned on the capsule's top-right corner, so
+appearing on hover never moves neighbouring capsules. It deletes immediately, without
+a confirmation step. List delete controls are also fixed-width and immediate.
 
-### 3.5 Cat art stretches between poses — FIXED, RELEASE PENDING
+### 3.5 Cat art stretches between poses — FIXED
 
 The old sleeping pose compressed a standing torso to 50% height, widened it to 120%,
 and crushed the legs to 20%. That was deliberate CSS but visibly looked broken. Lying
 and sleeping cats now have their own curled silhouette. Movement, tail, blink and
 breathing animation use translation/rotation only; the body is never distorted.
+
+### 3.6 Dashboard filters and backup dismissal — FIXED IN 1.6.3
+
+Filter transitions now replace state with a fresh plain snapshot before every async
+query. Status selection is included in the active-filter count, and resetting creates
+new nested arrays instead of reusing defaults. A rendered interaction check marked a
+product `Už nechceme`, recovered it through that status filter, and reset back to the
+wanted-only view. `Později` now dismisses the backup bar for the dashboard session.
+
+### 3.7 Persistent personal themes — FIXED IN 1.6.3
+
+The tech workstation, circuit rail and moving packets remain behind the dashboard when
+products exist. The pastel theme likewise keeps the black cat and spotted white cat
+moving along a bottom lane, behind content and without pointer events. The cats'
+startup loop was also moved outside Svelte effect tracking; previously it could hit
+Svelte's infinite-update guard and stop the partner dashboard before data loaded.
 
 ---
 
@@ -192,7 +207,8 @@ Not assumed — checked, and in most cases pinned down by tests.
 - **List privacy**: 14 tests, including that asking for a private list by id directly
   still returns nothing, and that an item in both a shared and a private list stays
   visible to both.
-- **Filters, sort, surprise mode**: 23 tests.
+- **Filters, sort, surprise mode**: includes dropped-only, all-status and clean-reset
+  regression coverage.
 - **The write path**: 11 tests against a real IndexedDB.
 - **Settings round-trip**: 7 tests — the active person *does* persist across a reload.
 - **The update chain**: verified over HTTPS after every release — `updates.json`
@@ -218,16 +234,8 @@ Not assumed — checked, and in most cases pinned down by tests.
 
 ## 6. Honest assessment
 
-The parts that can be tested are in good shape. Extraction, the data layer, the
-visibility rules and the release plumbing are covered by 129 tests and have behaved
-correctly every time they have been exercised.
-
-The parts that cannot be tested here are not. Every remaining bug lives in browser
-runtime behaviour — Svelte reactivity, DOM lifecycle, event timing — and my
-verification has been rendering compiled CSS and SVG in a headless browser, which
-cannot see any of it. That gap is why 3.1 has been "fixed" four times and why 3.2 was
-addressed twice without touching the actual fault.
-
-Continuing to guess is not working. The next step that would actually move these is
-console output from the running extension, or a debugging session against the real
-thing — not another blind change.
+The data and extraction layers remain well covered, and v1.6.3 closes the earlier
+runtime-verification gap. The compiled dashboard was loaded with real IndexedDB data,
+its controls were exercised through the rendered DOM, both themes were visually
+inspected with products present, and the corrected partner dashboard produced no new
+runtime warnings or errors.

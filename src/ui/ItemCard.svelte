@@ -52,6 +52,15 @@
         <span class="badge badge-gift"><Icon name="gift" size={12} weight={2} />{personNames[item.giftFor]}</span>
       {/if}
     </div>
+
+    <a
+      class="open-link"
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Otevřít {item.title} v novém panelu"
+      title="Otevřít původní produkt"
+    ><Icon name="external" size={17} weight={2.1} /></a>
   </div>
 
   <div class="body">
@@ -150,6 +159,30 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 3px;
+  }
+
+  .open-link {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+    border-radius: 50%;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--bg) 55%, transparent);
+    backdrop-filter: blur(6px);
+  }
+
+  .open-link:hover,
+  .open-link:focus-visible {
+    color: var(--accent-contrast);
+    background: var(--accent);
+    transform: translateY(-1px);
   }
 
   .body {

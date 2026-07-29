@@ -26,7 +26,12 @@
     queryItems,
     tagUsage,
   } from '@/src/data/queries';
-  import { DEFAULT_FILTERS, type ItemFilters } from '@/src/domain/filters';
+  import {
+    createDefaultFilters,
+    DEFAULT_FILTERS,
+    snapshotFilters,
+    type ItemFilters,
+  } from '@/src/domain/filters';
   import { SORT_LABELS, type SortMode } from '@/src/domain/sort';
   import {
     ITEM_STATUSES,
@@ -63,14 +68,12 @@
   let listCounts = $state<Map<string, number>>(new Map());
   let totalCount = $state(0);
 
-  let filters = $state<ItemFilters>({ ...DEFAULT_FILTERS });
+  let filters = $state<ItemFilters>(createDefaultFilters());
   let sort = $state<SortMode>('want-combined');
   let selected = $state<Set<string>>(new Set());
   let openItemId = $state<string | null>(null);
   let showSettings = $state(false);
-  let dismissedBackupNag = $state(false);
-  /** Id of the list/category/tag awaiting delete confirmation, if any. */
-  let confirmingDelete = $state<string | null>(null);
+  let dismissedBackupNag = $state(sessionStorage.getItem('pluck:backup-nag-dismissed') === '1');
   let missingDefaultCount = $state(0);
   /** Non-empty when a sidebar action failed; shown rather than swallowed. */
   let failure = $state('');
@@ -111,14 +114,15 @@
     await refresh();
   }
 
-  async function refresh() {
+  async function refresh(filterValue: ItemFilters = filters) {
     if (!settings) return;
 
     const version = ++refreshVersion;
     const ctx = { viewer: settings.activePerson, surpriseMode: settings.surpriseMode };
+    const queryFilters = snapshotFilters(filterValue);
 
     const result = await Promise.all([
-      queryItems(ctx, filters, sort),
+      queryItems(ctx, queryFilters, sort),
       listCategories(),
       listTags(),
       listSites(ctx),
@@ -135,13 +139,16 @@
     // Drop any list filter pointing at a list this person can no longer see — for
     // instance after switching person with a private list selected.
     const visibleListIds = new Set(lists.map((entry) => entry.id));
-    if (filters.listIds.some((id) => !visibleListIds.has(id))) {
-      filters.listIds = filters.listIds.filter((id) => visibleListIds.has(id));
+    if (queryFilters.listIds.some((id) => !visibleListIds.has(id))) {
+      filters = {
+        ...queryFilters,
+        listIds: queryFilters.listIds.filter((id) => visibleListIds.has(id)),
+      };
     }
 
     // Count everything visible, ignoring filters, so the backup nag and the empty
     // state can tell "no items yet" apart from "nothing matches this filter".
-    totalCount = (await queryItems(ctx, { ...DEFAULT_FILTERS, statuses: [] })).length;
+    totalCount = (await queryItems(ctx, { ...createDefaultFilters(), statuses: [] })).length;
 
     // Drop selections that the current filter no longer shows, so a bulk action can
     // never hit something off-screen.
@@ -164,10 +171,12 @@
   }
 
   function toggleStatus(status: ItemStatus) {
-    filters.statuses = filters.statuses.includes(status)
-      ? filters.statuses.filter((value) => value !== status)
-      : [...filters.statuses, status];
-    void refresh();
+    const next = snapshotFilters(filters);
+    next.statuses = next.statuses.includes(status)
+      ? next.statuses.filter((value) => value !== status)
+      : [...next.statuses, status];
+    filters = next;
+    void refresh(next);
   }
 
   function toggleList(id: string) {
@@ -192,8 +201,14 @@
   }
 
   function resetFilters() {
-    filters = { ...DEFAULT_FILTERS };
-    void refresh();
+    const next = createDefaultFilters();
+    filters = next;
+    void refresh(next);
+  }
+
+  function dismissBackupNag() {
+    dismissedBackupNag = true;
+    sessionStorage.setItem('pluck:backup-nag-dismissed', '1');
   }
 
   function toggleSelect(id: string) {
@@ -272,7 +287,6 @@
       else if (kind === 'category') await deleteCategory(id);
       else await deleteTag(id);
 
-      confirmingDelete = null;
     });
   }
 
@@ -283,7 +297,11 @@
   const openItem = $derived(items.find((item) => item.id === openItemId) ?? null);
   const categoryById = $derived(new Map(categories.map((category) => [category.id, category])));
   const activeFilterCount = $derived(
-    filters.categoryIds.length +
+    (filters.statuses.length === DEFAULT_FILTERS.statuses.length &&
+    filters.statuses.every((status) => DEFAULT_FILTERS.statuses.includes(status))
+      ? 0
+      : 1) +
+      filters.categoryIds.length +
       filters.tagIds.length +
       filters.listIds.length +
       filters.sites.length +
@@ -336,7 +354,7 @@
         type="search"
         placeholder="Hledat v názvu, značce, obchodu, poznámkách…"
         bind:value={filters.search}
-        oninput={refresh}
+        oninput={() => refresh()}
         aria-label="Hledat položky"
       />
 
@@ -366,7 +384,7 @@
             <Icon name="list" size={15} />
           </button>
         </div>
-        <select bind:value={sort} onchange={refresh} aria-label="Řadit podle" class="sort">
+        <select bind:value={sort} onchange={() => refresh()} aria-label="Řadit podle" class="sort">
           {#each Object.entries(SORT_LABELS) as [value, label] (value)}
             <option {value}>{label}</option>
           {/each}
@@ -393,7 +411,7 @@
           <button class="btn btn-sm" onclick={async () => { await downloadBackup(); settings = await loadSettings(); }}>
             Zálohovat teď
           </button>
-          <button class="btn btn-ghost btn-sm" onclick={() => (dismissedBackupNag = true)}>
+          <button type="button" class="btn btn-ghost btn-sm" onclick={dismissBackupNag}>
             Později
           </button>
         </div>
@@ -428,40 +446,27 @@
                 <span class="muted count-badge">{listCounts.get(entry.id) ?? 0}</span>
               </label>
 
-              {#if confirmingDelete === entry.id}
-                <button class="mini danger" onclick={() => removeThing('list', entry.id)}>
-                  Smazat
-                </button>
-                <button class="mini" onclick={() => (confirmingDelete = null)}>Zpět</button>
-              {:else}
-                <button
-                  class="mini icon-only"
-                  class:on={entry.visibility === 'private'}
-                  title={entry.visibility === 'private'
-                    ? 'Soukromý — vidíš ho jen ty. Kliknutím zveřejníš.'
-                    : 'Sdílený. Kliknutím uděláš soukromý.'}
-                  aria-label="Přepnout soukromí seznamu {entry.name}"
-                  onclick={() => toggleListPrivacy(entry)}
-                >
-                  <Icon name={entry.visibility === 'private' ? 'heart' : 'star-empty'} size={11} />
-                </button>
-                <button
-                  class="mini icon-only"
-                  aria-label="Smazat seznam {entry.name}"
-                  onclick={() => (confirmingDelete = entry.id)}
-                >
-                  <Icon name="close" size={10} weight={2.4} />
-                </button>
-              {/if}
+              <button
+                class="mini icon-only"
+                class:on={entry.visibility === 'private'}
+                title={entry.visibility === 'private'
+                  ? 'Soukromý — vidíš ho jen ty. Kliknutím zveřejníš.'
+                  : 'Sdílený. Kliknutím uděláš soukromý.'}
+                aria-label="Přepnout soukromí seznamu {entry.name}"
+                onclick={() => toggleListPrivacy(entry)}
+              >
+                <Icon name={entry.visibility === 'private' ? 'heart' : 'star-empty'} size={11} />
+              </button>
+              <button
+                class="mini icon-only delete"
+                aria-label="Smazat seznam {entry.name}"
+                title="Smazat seznam"
+                onclick={() => removeThing('list', entry.id)}
+              >
+                <Icon name="close" size={10} weight={2.4} />
+              </button>
             </div>
           {/each}
-
-          {#if confirmingDelete && lists.some((entry) => entry.id === confirmingDelete)}
-            <p class="warn">
-              Položky se nesmažou — jen ze seznamu vypadnou. Pokud nejsou v žádném jiném, uvidíte
-              je oba, i když byl soukromý.
-            </p>
-          {/if}
         </section>
 
         <section>
@@ -485,7 +490,7 @@
           </h3>
           <div class="chips">
             {#each categories as category (category.id)}
-              <span class="pill-wrap" class:confirming={confirmingDelete === category.id}>
+              <span class="pill-wrap">
                 <button
                   class="pill"
                   class:on={filters.categoryIds.includes(category.id)}
@@ -494,19 +499,14 @@
                   <Icon name={category.icon} size={12} weight={1.9} />
                   {category.name}
                 </button>
-                {#if confirmingDelete === category.id}
-                  <button class="pill-x confirm" onclick={() => removeThing('category', category.id)}>
-                    Smazat?
-                  </button>
-                {:else}
-                  <button
-                    class="pill-x"
-                    aria-label="Smazat kategorii {category.name}"
-                    onclick={() => (confirmingDelete = category.id)}
-                  >
-                    <Icon name="close" size={9} weight={2.6} />
-                  </button>
-                {/if}
+                <button
+                  class="pill-x"
+                  aria-label="Smazat kategorii {category.name}"
+                  title="Smazat kategorii"
+                  onclick={() => removeThing('category', category.id)}
+                >
+                  <Icon name="close" size={9} weight={2.6} />
+                </button>
               </span>
             {/each}
           </div>
@@ -528,26 +528,21 @@
           </h3>
           <div class="chips">
             {#each tags as tag (tag.id)}
-              <span class="pill-wrap" class:confirming={confirmingDelete === tag.id}>
+              <span class="pill-wrap">
                 <TagChip
                   {tag}
                   selected={filters.tagIds.includes(tag.id)}
                   count={usage.get(tag.id) ?? 0}
                   onclick={() => toggleTagFilter(tag.id)}
                 />
-                {#if confirmingDelete === tag.id}
-                  <button class="pill-x confirm" onclick={() => removeThing('tag', tag.id)}>
-                    Smazat?
-                  </button>
-                {:else}
-                  <button
-                    class="pill-x"
-                    aria-label="Smazat štítek {tag.name}"
-                    onclick={() => (confirmingDelete = tag.id)}
-                  >
-                    <Icon name="close" size={9} weight={2.6} />
-                  </button>
-                {/if}
+                <button
+                  class="pill-x"
+                  aria-label="Smazat štítek {tag.name}"
+                  title="Smazat štítek"
+                  onclick={() => removeThing('tag', tag.id)}
+                >
+                  <Icon name="close" size={9} weight={2.6} />
+                </button>
               </span>
             {/each}
           </div>
@@ -563,7 +558,7 @@
           <h3>Chce to</h3>
           <select
             bind:value={filters.wantOf}
-            onchange={refresh}
+            onchange={() => refresh()}
             aria-label="Podle čího hodnocení filtrovat"
           >
             <option value="either">Kdokoli z nás</option>
@@ -660,57 +655,50 @@
           <div class="bulkbar card">
             <span>Vybráno: <strong>{selected.size}</strong></span>
             <div class="row wrap">
-              <button class="btn btn-sm" onclick={() => bulk(() => bulkSetStatus([...selected], 'bought'))}>
-                Koupeno
+              <button class="btn btn-sm bulk-action bought" onclick={() => bulk(() => bulkSetStatus([...selected], 'bought'))}>
+                <Icon name="checkCircle" size={16} weight={2} /> Koupeno
               </button>
-              <button class="btn btn-sm" onclick={() => bulk(() => bulkSetStatus([...selected], 'dropped'))}>
-                Už nechceme
+              <button class="btn btn-sm bulk-action dropped" onclick={() => bulk(() => bulkSetStatus([...selected], 'dropped'))}>
+                <Icon name="archive" size={16} weight={2} /> Už nechceme
               </button>
-              <button class="btn btn-sm" onclick={() => bulk(() => bulkSetStatus([...selected], 'wanted'))}>
-                Zpět mezi chtěné
+              <button class="btn btn-sm bulk-action wanted" onclick={() => bulk(() => bulkSetStatus([...selected], 'wanted'))}>
+                <Icon name="heart" size={16} weight={2} /> Zpět mezi chtěné
               </button>
-              <select
-                aria-label="Přidat vybraným štítek"
-                onchange={(event) => {
-                  const tagId = event.currentTarget.value;
-                  if (tagId) void bulk(() => bulkAddTag([...selected], tagId));
-                  event.currentTarget.value = '';
-                }}
-              >
-                <option value="">Přidat štítek…</option>
-                {#each tags as tag (tag.id)}
-                  <option value={tag.id}>{tag.name}</option>
-                {/each}
-              </select>
-              <select
-                aria-label="Přidat vybrané do seznamu"
-                onchange={(event) => {
-                  const listId = event.currentTarget.value;
-                  if (listId) void bulk(() => bulkAddToList([...selected], listId));
-                  event.currentTarget.value = '';
-                }}
-              >
-                <option value="">Přidat do seznamu…</option>
-                {#each lists as entry (entry.id)}
-                  <option value={entry.id}>{entry.name}</option>
-                {/each}
-              </select>
-              <select
-                aria-label="Nastavit vybraným kategorii"
-                onchange={(event) => {
-                  const value = event.currentTarget.value;
-                  if (value) void bulk(() => bulkSetCategory([...selected], value));
-                  event.currentTarget.value = '';
-                }}
-              >
-                <option value="">Nastavit kategorii…</option>
-                {#each categories as category (category.id)}
-                  <!-- Native <option> can't hold an SVG, so the select shows names only. -->
-                  <option value={category.id}>{category.name}</option>
-                {/each}
-              </select>
+              <label class="bulk-select tag-select">
+                <Icon name="tag" size={15} weight={2} />
+                <select aria-label="Přidat vybraným štítek" onchange={(event) => {
+                    const tagId = event.currentTarget.value;
+                    if (tagId) void bulk(() => bulkAddTag([...selected], tagId));
+                    event.currentTarget.value = '';
+                  }}>
+                  <option value="">Přidat štítek…</option>
+                  {#each tags as tag (tag.id)}<option value={tag.id}>{tag.name}</option>{/each}
+                </select>
+              </label>
+              <label class="bulk-select list-select">
+                <Icon name="collection" size={15} weight={2} />
+                <select aria-label="Přidat vybrané do seznamu" onchange={(event) => {
+                    const listId = event.currentTarget.value;
+                    if (listId) void bulk(() => bulkAddToList([...selected], listId));
+                    event.currentTarget.value = '';
+                  }}>
+                  <option value="">Přidat do seznamu…</option>
+                  {#each lists as entry (entry.id)}<option value={entry.id}>{entry.name}</option>{/each}
+                </select>
+              </label>
+              <label class="bulk-select category-select">
+                <Icon name="box" size={15} weight={2} />
+                <select aria-label="Nastavit vybraným kategorii" onchange={(event) => {
+                    const value = event.currentTarget.value;
+                    if (value) void bulk(() => bulkSetCategory([...selected], value));
+                    event.currentTarget.value = '';
+                  }}>
+                  <option value="">Nastavit kategorii…</option>
+                  {#each categories as category (category.id)}<option value={category.id}>{category.name}</option>{/each}
+                </select>
+              </label>
               <button class="btn btn-ghost btn-sm" onclick={() => (selected = new Set())}>
-                Zrušit výběr
+                <Icon name="close" size={14} weight={2} /> Zrušit výběr
               </button>
             </div>
           </div>
@@ -1003,6 +991,7 @@
   /* A managed row: the filter checkbox takes the space, controls sit at the end and
      only appear on hover or focus so the sidebar stays calm while browsing. */
   .manage-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -1036,7 +1025,6 @@
   .manage-row:hover .mini,
   .manage-row:focus-within .mini,
   .mini:focus-visible,
-  .mini.danger,
   .mini.on {
     opacity: 1;
   }
@@ -1050,76 +1038,49 @@
     color: var(--gift);
   }
 
-  .mini.danger {
+  .mini.delete:hover,
+  .mini.delete:focus-visible {
     color: var(--danger);
     border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   }
 
-  /*
-   * The delete control lives inside the capsule and only appears on hover.
-   *
-   * It is width-animated rather than opacity-toggled: an earlier version was
-   * absolutely positioned half outside the chip at 14px, which was easy to miss
-   * entirely and read as "clicking X does nothing". Here the capsule itself grows
-   * to make room, so the target is always fully inside a shape you are already
-   * pointing at.
-   */
   .pill-wrap {
+    position: relative;
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
   }
 
   .pill-x {
+    position: absolute;
+    z-index: 2;
+    top: -5px;
+    right: -5px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    /* Collapsed to nothing until the capsule is hovered or focused within. */
-    width: 0;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     padding: 0;
-    margin-left: -4px;
-    overflow: hidden;
-    border: none;
-    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
     color: var(--text-dim);
-    font-size: 10px;
     opacity: 0;
-    transition:
-      width 0.14s ease,
-      opacity 0.14s ease,
-      margin 0.14s ease,
-      color 0.12s ease;
+    transform: scale(0.72);
+    transition: opacity 0.12s ease, transform 0.12s ease, color 0.12s ease;
   }
 
   .pill-wrap:hover .pill-x,
-  .pill-wrap:focus-within .pill-x,
-  .pill-wrap.confirming .pill-x {
-    width: 18px;
-    margin-left: 0;
-    margin-right: 4px;
-    opacity: 0.75;
+  .pill-wrap:focus-within .pill-x {
+    opacity: 0.9;
+    transform: scale(1);
   }
 
   .pill-x:hover,
   .pill-x:focus-visible {
     opacity: 1;
     color: var(--danger);
-  }
-
-  .pill-wrap.confirming .pill-x.confirm {
-    width: auto;
-    padding: 0 7px;
-    opacity: 1;
-    color: var(--danger);
-    font-weight: 600;
-  }
-
-  .warn {
-    margin: 2px 0 0;
-    font-size: 10.5px;
-    line-height: 1.4;
-    color: var(--text-dim);
   }
 
   .sidebar-error {
@@ -1239,7 +1200,43 @@
   .bulkbar select {
     width: auto;
     font-size: 12px;
-    padding: 4px 6px;
+    padding: 4px 7px 4px 25px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+  }
+
+  .bulk-action,
+  .bulk-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .bulk-action.bought { color: var(--ok); }
+  .bulk-action.dropped { color: var(--danger); }
+  .bulk-action.wanted { color: var(--accent); }
+
+  .bulk-select {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .bulk-select > :global(svg) {
+    position: absolute;
+    left: 7px;
+    pointer-events: none;
+  }
+
+  .tag-select { color: var(--gift); }
+  .list-select { color: var(--accent); }
+  .category-select { color: var(--text); }
+
+  .bulk-select select option {
+    color: var(--text);
+    background: var(--surface);
   }
 
   .empty {
